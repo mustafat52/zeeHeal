@@ -9,7 +9,7 @@ const tabs = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/plan", label: "Plan", icon: CalendarDays },
   { href: "/progress", label: "Progress", icon: LineChart },
-  { href: "/chat", label: "Chat", icon: MessageCircle },
+  { href: "/chat", label: "Ask Zainab", icon: MessageCircle },
 ];
 
 export function ClientBottomNav() {

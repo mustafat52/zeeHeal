@@ -91,10 +91,7 @@ export default function ClientHomePage() {
                 transition={{ duration: 0.3, delay: i * 0.05 }}
               >
                 <Card className="py-3">
-                  <div
-                    onClick={() => setLoggingMealId(meal.id)}
-                    className="flex items-center gap-3 tap-scale cursor-pointer"
-                  >
+                  <div className="flex items-center gap-3">
                     <div
                       className={clsx(
                         "w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden",
@@ -126,13 +123,20 @@ export default function ClientHomePage() {
                       </p>
                     </div>
                     {done ? (
-                      <div className="w-6 h-6 rounded-full bg-sage-600 border-sage-600 flex items-center justify-center shrink-0">
+                      <button
+                        onClick={() => setLoggingMealId(meal.id)}
+                        className="tap-scale w-6 h-6 rounded-full bg-sage-600 border-sage-600 flex items-center justify-center shrink-0"
+                        aria-label="Edit log"
+                      >
                         <Check size={13} className="text-white" />
-                      </div>
+                      </button>
                     ) : (
-                      <div className="w-6 h-6 rounded-full border border-sage-200 flex items-center justify-center shrink-0">
-                        <Camera size={12} className="text-sage-400" />
-                      </div>
+                      <button
+                        onClick={() => setLoggingMealId(meal.id)}
+                        className="tap-scale shrink-0 flex items-center gap-1.5 bg-sage-600 text-white text-xs font-medium px-3 py-2 rounded-full"
+                      >
+                        <Camera size={13} /> Log
+                      </button>
                     )}
                   </div>
 
