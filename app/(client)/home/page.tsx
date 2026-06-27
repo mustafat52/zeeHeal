@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LogMealModal } from "@/components/client/LogMealModal";
+import { LogoutButton } from "@/components/ui/LogoutButton";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Droplets, Flame, Sun, Sunrise, Moon, Cookie, Camera, MessageSquareText } from "lucide-react";
 import clsx from "clsx";
@@ -32,11 +33,16 @@ export default function ClientHomePage() {
   return (
     <div>
       <div className="bg-sage-100 px-6 pt-12 pb-6 rounded-b-[28px]">
-        <p className="text-sage-800 text-sm">Good evening, {client.name.split(" ")[0]}</p>
-        <h1 className="font-display text-2xl text-moss-900 mt-1">
-          Day {client.streak} of your plan
-        </h1>
-        <Pill tone="sage">{client.planType}</Pill>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sage-800 text-sm">Good evening, {client.name.split(" ")[0]}</p>
+            <h1 className="font-display text-2xl text-moss-900 mt-1">
+              Day {client.streak} of your plan
+            </h1>
+            <Pill tone="sage">{client.planType}</Pill>
+          </div>
+          <LogoutButton className="mt-1" />
+        </div>
       </div>
 
       <div className="px-5 -mt-3">

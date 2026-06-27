@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { DigestCard } from "@/components/nutritionist/DigestCard";
+import { LogoutButton } from "@/components/ui/LogoutButton";
 import { generateDigest } from "@/lib/digest";
 import { AlertCircle, ChevronRight } from "lucide-react";
 
@@ -22,8 +23,13 @@ export default function NutritionistDashboardPage() {
 
   return (
     <div className="pt-12 px-5">
-      <p className="text-sm text-moss-400">Good evening</p>
-      <h1 className="font-display text-2xl text-moss-900 mb-4">Zainab&apos;s clients</h1>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <p className="text-sm text-moss-400">Good evening</p>
+          <h1 className="font-display text-2xl text-moss-900">Zainab&apos;s clients</h1>
+        </div>
+        <LogoutButton className="bg-sage-100" />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         <Card>
