@@ -6,9 +6,11 @@ import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { DigestCard } from "@/components/nutritionist/DigestCard";
+import { NewClientFormModal } from "@/components/nutritionist/NewClientFormModal";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { generateDigest } from "@/lib/digest";
-import { AlertCircle, ChevronRight, Search } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { AlertCircle, ChevronRight, Search, Plus } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   "on-track": "On track",
@@ -18,7 +20,9 @@ const statusLabel: Record<string, string> = {
 
 export default function NutritionistDashboardPage() {
   const clients = useAppStore((s) => s.clients);
+  const addClient = useAppStore((s) => s.addClient);
   const [query, setQuery] = useState("");
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
 
   const needsAttention = clients.filter((c) => c.status === "needs-attention").length;
   const digestItems = generateDigest(clients);
@@ -60,14 +64,23 @@ export default function NutritionistDashboardPage() {
           <span className="text-xs text-moss-400">{filteredClients.length} total</span>
         </div>
 
-        <div className="relative mb-4">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-moss-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search clients"
-            className="w-full bg-white border border-sage-100 rounded-xl pl-9 pr-3.5 py-2.5 text-sm outline-none focus:border-sage-400"
-          />
+        <div className="flex gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-moss-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search clients"
+              className="w-full bg-white border border-sage-100 rounded-xl pl-9 pr-3.5 py-2.5 text-sm outline-none focus:border-sage-400"
+            />
+          </div>
+          <button
+            onClick={() => setShowNewClientForm(true)}
+            className="tap-scale w-11 h-11 rounded-xl bg-sage-600 flex items-center justify-center shrink-0"
+            aria-label="Add new client"
+          >
+            <Plus size={18} className="text-white" />
+          </button>
         </div>
 
         <div className="flex flex-col gap-2.5">
@@ -103,6 +116,18 @@ export default function NutritionistDashboardPage() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {showNewClientForm && (
+          <NewClientFormModal
+            onClose={() => setShowNewClientForm(false)}
+            onSave={(client) => {
+              addClient(client);
+              setShowNewClientForm(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

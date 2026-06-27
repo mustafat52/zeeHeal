@@ -7,20 +7,24 @@ import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { PrepSheetModal } from "@/components/nutritionist/PrepSheetModal";
+import { ClientProfileFormModal } from "@/components/nutritionist/ClientProfileFormModal";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, MessageCircle, ClipboardList } from "lucide-react";
+import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone } from "lucide-react";
 
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
   const clientId = params.id as string;
   const client = useAppStore((s) => s.clients.find((c) => c.id === clientId));
+  const setCheckinConfig = useAppStore((s) => s.setCheckinConfig);
   const [showPrepSheet, setShowPrepSheet] = useState(false);
+  const [showProfileForm, setShowProfileForm] = useState(false);
 
   if (!client) return null;
 
   const doneToday = client.todayPlan.meals.filter((m) => m.status === "done").length;
+  const configuredCount = Object.values(client.checkinConfig ?? {}).filter(Boolean).length;
 
   return (
     <div className="pt-12 px-5">
@@ -35,21 +39,37 @@ export default function ClientDetailPage() {
         <div>
           <h1 className="font-display text-xl text-moss-900">{client.name}</h1>
           <Pill tone="sage">{client.planType}</Pill>
+          <p className="text-xs text-moss-400 mt-1">{client.phone}</p>
         </div>
       </div>
 
-      <button
-        onClick={() => setShowPrepSheet(true)}
-        className="tap-scale w-full flex items-center gap-3 bg-clay-100 rounded-xl p-3.5 mb-5"
-      >
-        <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
-          <ClipboardList size={16} className="text-clay-600" />
-        </div>
-        <div className="text-left">
-          <p className="text-sm font-medium text-clay-600">Prep for your call</p>
-          <p className="text-xs text-clay-600/70">One-page summary before you talk</p>
-        </div>
-      </button>
+      <div className="flex gap-2.5 mb-5">
+        <button
+          onClick={() => setShowPrepSheet(true)}
+          className="tap-scale flex-1 flex items-center gap-3 bg-clay-100 rounded-xl p-3.5"
+        >
+          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
+            <ClipboardList size={16} className="text-clay-600" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-medium text-clay-600">Prep for call</p>
+            <p className="text-xs text-clay-600/70">Quick summary</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setShowProfileForm(true)}
+          className="tap-scale flex-1 flex items-center gap-3 bg-sage-100 rounded-xl p-3.5"
+        >
+          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
+            <Settings2 size={16} className="text-sage-700" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-medium text-sage-800">Check-in setup</p>
+            <p className="text-xs text-sage-700/70">{configuredCount} fields on</p>
+          </div>
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         <Card>
@@ -63,6 +83,63 @@ export default function ClientDetailPage() {
           </p>
         </Card>
       </div>
+
+      {client.todayCheckin && (
+        <Card className="mb-5">
+          <p className="text-sm font-medium text-moss-600 mb-3">Today&apos;s check-in</p>
+          <div className="grid grid-cols-2 gap-3">
+            {client.todayCheckin.weight !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Weight</p>
+                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.weight} kg</p>
+              </div>
+            )}
+            {client.todayCheckin.sleepHours !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Sleep</p>
+                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.sleepHours} hrs</p>
+              </div>
+            )}
+            {client.todayCheckin.bloating !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Bloating</p>
+                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.bloating}/10</p>
+              </div>
+            )}
+            {client.todayCheckin.skinCondition !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Skin condition</p>
+                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.skinCondition}/10</p>
+              </div>
+            )}
+            {client.todayCheckin.hairFall !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Hair fall</p>
+                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.hairFall}/10</p>
+              </div>
+            )}
+            {client.todayCheckin.cycleDay !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Cycle day</p>
+                <p className="text-sm font-medium text-moss-900">Day {client.todayCheckin.cycleDay}</p>
+              </div>
+            )}
+            {client.todayCheckin.activityType && client.todayCheckin.activityType !== "None" && (
+              <div>
+                <p className="text-xs text-moss-400">Activity</p>
+                <p className="text-sm font-medium text-moss-900">
+                  {client.todayCheckin.activityType} · {client.todayCheckin.activityMinutes}min
+                </p>
+              </div>
+            )}
+          </div>
+          {client.todayCheckin.note && (
+            <p className="text-xs text-moss-600 mt-3 pt-3 border-t border-sage-100 italic">
+              &quot;{client.todayCheckin.note}&quot;
+            </p>
+          )}
+        </Card>
+      )}
 
       <Card className="mb-5">
         <p className="text-sm font-medium text-moss-600 mb-3">Weight trend</p>
@@ -88,13 +165,31 @@ export default function ClientDetailPage() {
         ))}
       </div>
 
-      <Button variant="primary" className="w-full" onClick={() => router.push(`/client/${client.id}/chat`)}>
-        <MessageCircle size={16} /> Message {client.name.split(" ")[0]}
-      </Button>
+      <div className="flex gap-2.5">
+        <Button variant="primary" className="flex-1" onClick={() => router.push(`/client/${client.id}/chat`)}>
+          <MessageCircle size={16} /> Message
+        </Button>
+        <a
+          href={`tel:${client.phone.replace(/\s/g, "")}`}
+          className="tap-scale flex-1 flex items-center justify-center gap-2 bg-sage-100 text-sage-800 rounded-xl py-3 text-sm font-medium"
+        >
+          <Phone size={16} /> Call
+        </a>
+      </div>
 
       <AnimatePresence>
         {showPrepSheet && (
           <PrepSheetModal client={client} onClose={() => setShowPrepSheet(false)} />
+        )}
+        {showProfileForm && (
+          <ClientProfileFormModal
+            client={client}
+            onClose={() => setShowProfileForm(false)}
+            onSave={(config) => {
+              setCheckinConfig(client.id, config);
+              setShowProfileForm(false);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

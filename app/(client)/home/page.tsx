@@ -5,9 +5,10 @@ import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LogMealModal } from "@/components/client/LogMealModal";
+import { DailyCheckinModal } from "@/components/client/DailyCheckinModal";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Droplets, Flame, Sun, Sunrise, Moon, Cookie, Camera, MessageSquareText } from "lucide-react";
+import { Check, Droplets, Flame, Sun, Sunrise, Moon, Cookie, Camera, MessageSquareText, ClipboardList, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 
 const mealIcons: Record<string, any> = {
@@ -21,9 +22,11 @@ export default function ClientHomePage() {
   const activeClientId = useAppStore((s) => s.activeClientId);
   const client = useAppStore((s) => s.clients.find((c) => c.id === activeClientId));
   const logMeal = useAppStore((s) => s.logMeal);
+  const logCheckin = useAppStore((s) => s.logCheckin);
   const addWater = useAppStore((s) => s.addWater);
   const [loggingMealId, setLoggingMealId] = useState<string | null>(null);
   const [expandedMealId, setExpandedMealId] = useState<string | null>(null);
+  const [checkinOpen, setCheckinOpen] = useState(false);
 
   if (!client) return null;
 
@@ -68,6 +71,49 @@ export default function ClientHomePage() {
             </div>
           </button>
         </Card>
+      </div>
+
+      <div className="px-5 mt-3">
+        {client.todayCheckin ? (
+          <button
+            onClick={() => setCheckinOpen(true)}
+            className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 shadow-card rounded-xl p-3.5"
+          >
+            <div className="w-9 h-9 rounded-full bg-sage-100 flex items-center justify-center shrink-0">
+              <Check size={15} className="text-sage-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium text-moss-900">Today&apos;s check-in done</p>
+              <p className="text-xs text-moss-400">
+                {[
+                  client.todayCheckin.weight !== undefined && `${client.todayCheckin.weight}kg`,
+                  client.todayCheckin.sleepHours !== undefined && `${client.todayCheckin.sleepHours}h sleep`,
+                  client.todayCheckin.bloating !== undefined && `bloating ${client.todayCheckin.bloating}/10`,
+                  client.todayCheckin.skinCondition !== undefined && `skin ${client.todayCheckin.skinCondition}/10`,
+                  client.todayCheckin.hairFall !== undefined && `hair fall ${client.todayCheckin.hairFall}/10`,
+                ]
+                  .filter(Boolean)
+                  .slice(0, 3)
+                  .join(" · ")}
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-moss-400 shrink-0" />
+          </button>
+        ) : (
+          <button
+            onClick={() => setCheckinOpen(true)}
+            className="tap-scale w-full flex items-center gap-3 bg-clay-100 rounded-xl p-3.5"
+          >
+            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
+              <ClipboardList size={15} className="text-clay-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium text-clay-600">Do your daily check-in</p>
+              <p className="text-xs text-clay-600/70">Weight, sleep, mood, activity — under a minute</p>
+            </div>
+            <ChevronRight size={16} className="text-clay-600 shrink-0" />
+          </button>
+        )}
       </div>
 
       <div className="px-5 mt-6">
@@ -187,6 +233,16 @@ export default function ClientHomePage() {
             onSave={(data) => {
               logMeal(client.id, loggingMeal.id, data);
               setLoggingMealId(null);
+            }}
+          />
+        )}
+        {checkinOpen && (
+          <DailyCheckinModal
+            config={client.checkinConfig}
+            onClose={() => setCheckinOpen(false)}
+            onSave={(data) => {
+              logCheckin(client.id, data);
+              setCheckinOpen(false);
             }}
           />
         )}

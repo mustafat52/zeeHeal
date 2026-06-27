@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { chatThreads, Message } from "@/lib/mock-data/messages";
+import { ZAINAB_PHONE } from "@/lib/mock-data/clients";
 import { VoiceRecorder } from "@/components/client/VoiceRecorder";
 import { VoiceMessageBubble } from "@/components/client/VoiceMessageBubble";
-import { Send } from "lucide-react";
+import { Send, Phone } from "lucide-react";
 import clsx from "clsx";
 
 export default function ClientChatPage() {
@@ -44,10 +45,17 @@ export default function ClientChatPage() {
         <div className="w-10 h-10 rounded-full bg-sage-100 flex items-center justify-center font-medium text-sage-800">
           ZB
         </div>
-        <div>
+        <div className="flex-1">
           <p className="font-medium text-moss-900">Zainab</p>
           <p className="text-xs text-moss-400">Usually replies within a day</p>
         </div>
+        <a
+          href={`tel:${ZAINAB_PHONE.replace(/\s/g, "")}`}
+          className="tap-scale w-10 h-10 rounded-full bg-sage-100 flex items-center justify-center shrink-0"
+          aria-label="Call Zainab"
+        >
+          <Phone size={16} className="text-sage-700" />
+        </a>
       </div>
 
       <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto no-scrollbar pb-3">

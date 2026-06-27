@@ -20,6 +20,37 @@ export interface DayPlan {
   water: { current: number; goal: number };
 }
 
+export interface DailyCheckin {
+  weight?: number;
+  sleepHours?: number;
+  mood?: number;
+  bloating?: number;
+  activityType?: string;
+  activityMinutes?: number;
+  skinCondition?: number;
+  hairFall?: number;
+  cycleDay?: number;
+  waterGlasses?: number;
+  note?: string;
+  loggedAt?: string;
+}
+
+export const CHECKIN_FIELDS = [
+  { key: "weight", label: "Weight", hint: "Daily weigh-in" },
+  { key: "sleepHours", label: "Sleep", hint: "Hours slept" },
+  { key: "mood", label: "Mood / energy", hint: "How they're feeling" },
+  { key: "bloating", label: "Bloating / digestion", hint: "Gut health, GI symptoms" },
+  { key: "activity", label: "Activity", hint: "Exercise type and duration" },
+  { key: "skinCondition", label: "Skin condition", hint: "Acne, breakouts, flare-ups" },
+  { key: "hairFall", label: "Hair fall", hint: "PCOS, hormonal hair loss" },
+  { key: "cycleDay", label: "Cycle tracking", hint: "PCOS, hormone balance" },
+  { key: "waterGlasses", label: "Water intake", hint: "Hydration" },
+] as const;
+
+export type CheckinFieldKey = (typeof CHECKIN_FIELDS)[number]["key"];
+
+export type CheckinConfig = Partial<Record<CheckinFieldKey, boolean>>;
+
 export interface ProgressPoint {
   week: string;
   weight: number;
@@ -31,6 +62,7 @@ export interface Client {
   id: string;
   name: string;
   initials: string;
+  phone: string;
   planType: string;
   startDate: string;
   streak: number;
@@ -40,6 +72,8 @@ export interface Client {
   progress: ProgressPoint[];
   notes: { date: string; text: string }[];
   monthlyRecap?: string;
+  todayCheckin?: DailyCheckin;
+  checkinConfig?: CheckinConfig;
 }
 
 export const clients: Client[] = [
@@ -47,6 +81,7 @@ export const clients: Client[] = [
     id: "priya",
     name: "Priya Menon",
     initials: "PM",
+    phone: "+91 98765 43210",
     planType: "Gut health reset",
     startDate: "2 weeks ago",
     streak: 12,
@@ -108,11 +143,30 @@ export const clients: Client[] = [
     ],
     monthlyRecap:
       "This month your bloating dropped from a 7 to a 3, and you stuck to the plan 26 out of 30 days, that's the kind of consistency that actually moves the needle. The lunch swaps you asked for clearly worked better for your gut, so we're keeping those. Next month I want to focus on your energy levels in the afternoon, let's talk about that on our next call.",
+    todayCheckin: {
+      weight: 68.4,
+      sleepHours: 7,
+      mood: 4,
+      bloating: 3,
+      activityType: "Walk",
+      activityMinutes: 20,
+      note: "Felt good today, slept better than usual",
+      loggedAt: "This morning",
+    },
+    checkinConfig: {
+      weight: true,
+      sleepHours: true,
+      mood: true,
+      bloating: true,
+      activity: true,
+      waterGlasses: true,
+    },
   },
   {
     id: "ananya",
     name: "Ananya Reddy",
     initials: "AR",
+    phone: "+91 90123 45678",
     planType: "PCOS / hormone balance",
     startDate: "5 weeks ago",
     streak: 3,
@@ -171,11 +225,22 @@ export const clients: Client[] = [
     ],
     monthlyRecap:
       "This month was a tougher one, logging dropped off in week 3 and your bloating didn't move much. That's completely okay, some months are like that. Let's use our next call to figure out what got in the way, no judgement, just want to make next month easier for you.",
+    checkinConfig: {
+      weight: true,
+      sleepHours: true,
+      mood: true,
+      bloating: true,
+      activity: true,
+      skinCondition: true,
+      hairFall: true,
+      cycleDay: true,
+    },
   },
   {
     id: "fatima",
     name: "Fatima Sheikh",
     initials: "FS",
+    phone: "+91 99887 76655",
     planType: "Weight loss",
     startDate: "2 days ago",
     streak: 2,
@@ -225,7 +290,16 @@ export const clients: Client[] = [
     },
     progress: [{ week: "W1", weight: 82.0, bloating: 5, energy: 5 }],
     notes: [{ date: "2 days ago", text: "Onboarded. Mild lactose sensitivity, avoiding dairy in plan." }],
+    checkinConfig: {
+      weight: true,
+      sleepHours: true,
+      mood: true,
+      activity: true,
+      waterGlasses: true,
+    },
   },
 ];
 
 export const currentClientId = "priya";
+
+export const ZAINAB_PHONE = "+91 91234 56789";
