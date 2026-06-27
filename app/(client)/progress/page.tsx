@@ -1,13 +1,32 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendingDown, TrendingUp } from "lucide-react";
+
+function useChartWidth() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(280);
+
+  useEffect(() => {
+    function measure() {
+      if (ref.current) setWidth(ref.current.offsetWidth);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  return { ref, width };
+}
 
 export default function ClientProgressPage() {
   const activeClientId = useAppStore((s) => s.activeClientId);
   const client = useAppStore((s) => s.clients.find((c) => c.id === activeClientId));
+  const weightChart = useChartWidth();
+  const energyChart = useChartWidth();
 
   if (!client) return null;
 
@@ -57,9 +76,13 @@ export default function ClientProgressPage() {
 
       <Card className="mb-4">
         <p className="text-sm font-medium text-moss-600 mb-3">Weight trend</p>
-        <div className="h-44 -ml-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={client.progress}>
+        <div ref={weightChart.ref} className="h-44 -ml-2" style={{ contain: "layout paint" }}>
+          {weightChart.width > 0 && (
+            <LineChart
+              width={weightChart.width}
+              height={176}
+              data={client.progress}
+            >
               <XAxis
                 dataKey="week"
                 tick={{ fontSize: 11, fill: "#8A8F7E" }}
@@ -80,17 +103,22 @@ export default function ClientProgressPage() {
                 stroke="#7C9473"
                 strokeWidth={2.5}
                 dot={{ fill: "#7C9473", r: 3 }}
+                isAnimationActive={false}
               />
             </LineChart>
-          </ResponsiveContainer>
+          )}
         </div>
       </Card>
 
       <Card>
         <p className="text-sm font-medium text-moss-600 mb-3">Energy levels</p>
-        <div className="h-36 -ml-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={client.progress}>
+        <div ref={energyChart.ref} className="h-36 -ml-2" style={{ contain: "layout paint" }}>
+          {energyChart.width > 0 && (
+            <LineChart
+              width={energyChart.width}
+              height={144}
+              data={client.progress}
+            >
               <XAxis
                 dataKey="week"
                 tick={{ fontSize: 11, fill: "#8A8F7E" }}
@@ -111,9 +139,10 @@ export default function ClientProgressPage() {
                 stroke="#D9A06B"
                 strokeWidth={2.5}
                 dot={{ fill: "#D9A06B", r: 3 }}
+                isAnimationActive={false}
               />
             </LineChart>
-          </ResponsiveContainer>
+          )}
         </div>
       </Card>
     </div>
