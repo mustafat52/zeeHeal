@@ -24,10 +24,10 @@ export function SkincareHome({ client }: { client: Client }) {
 
   return (
     <div>
-      <div className="bg-sage-100 px-6 pt-12 pb-6 rounded-b-[28px]">
+      <div className="bg-teal-50 px-6 pt-12 pb-6 rounded-b-[28px]">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-sage-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
+            <p className="text-teal-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
             <h1 className="font-display text-2xl text-moss-900 mt-0.5">Skin & gut reset</h1>
           </div>
           <LogoutButton className="mt-1" />
@@ -55,8 +55,8 @@ export function SkincareHome({ client }: { client: Client }) {
             ))}
           </div>
           {scoreIndex !== null && (
-            <div className="flex items-center gap-2 bg-sage-50 rounded-lg px-3 py-2">
-              <Sparkles size={12} className="text-sage-600" />
+            <div className="flex items-center gap-2 bg-teal-50 rounded-lg px-3 py-2">
+              <Sparkles size={12} className="text-teal-600" />
               <p className="text-xs text-moss-600">
                 {scoreIndex <= 1
                   ? "Skin is looking good — keep up the plan."
@@ -117,7 +117,7 @@ export function SkincareHome({ client }: { client: Client }) {
           <p className="text-xs text-moss-400 mb-3">
             Take a photo for Zainab to track your progress visually.
           </p>
-          <button className="tap-scale w-full flex items-center justify-center gap-2 border border-dashed border-sage-200 rounded-xl py-3 text-sm text-sage-700 font-medium">
+          <button className="tap-scale w-full flex items-center justify-center gap-2 border border-dashed border-teal-200 rounded-xl py-3 text-sm text-teal-700 font-medium">
             <Camera size={16} /> Take today&apos;s photo
           </button>
         </div>

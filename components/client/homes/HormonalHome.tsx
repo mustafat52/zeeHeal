@@ -40,10 +40,10 @@ export function HormonalHome({ client }: { client: Client }) {
 
   return (
     <div>
-      <div className="bg-sage-100 px-6 pt-12 pb-6 rounded-b-[28px]">
+      <div className="bg-violet-50 px-6 pt-12 pb-6 rounded-b-[28px]">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-sage-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
+            <p className="text-violet-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
             <h1 className="font-display text-2xl text-moss-900 mt-0.5">Hormone balance plan</h1>
           </div>
           <LogoutButton className="mt-1" />
@@ -56,12 +56,12 @@ export function HormonalHome({ client }: { client: Client }) {
           <p className="text-xs font-medium text-moss-600 mb-3">Mood & energy this week</p>
           <div className="flex gap-1 mb-1">
             {mockMoodHistory.map((v, i) => (
-              <MiniBar key={i} value={v} max={5} color="bg-clay-200" />
+              <MiniBar key={i} value={v} max={5} color="bg-violet-200" />
             ))}
           </div>
           <div className="flex gap-1 mb-2">
             {mockEnergyHistory.map((v, i) => (
-              <MiniBar key={i} value={v} max={7} color="bg-sage-200" />
+              <MiniBar key={i} value={v} max={7} color="bg-violet-500" />
             ))}
           </div>
           <div className="flex gap-1">
@@ -71,10 +71,10 @@ export function HormonalHome({ client }: { client: Client }) {
           </div>
           <div className="flex items-center gap-3 mt-2.5">
             <span className="flex items-center gap-1 text-[10px] text-moss-400">
-              <span className="w-2 h-2 rounded-sm bg-clay-200 inline-block" /> Mood
+              <span className="w-2 h-2 rounded-sm bg-violet-200 inline-block" /> Mood
             </span>
             <span className="flex items-center gap-1 text-[10px] text-moss-400">
-              <span className="w-2 h-2 rounded-sm bg-sage-200 inline-block" /> Energy
+              <span className="w-2 h-2 rounded-sm bg-violet-500 inline-block" /> Energy
             </span>
           </div>
         </div>
@@ -103,7 +103,7 @@ export function HormonalHome({ client }: { client: Client }) {
           onClick={() => addWater(client.id)}
           className="tap-scale bg-white rounded-xl border border-sage-100/60 shadow-card p-3.5 text-left flex items-center gap-3"
         >
-          <Droplets size={20} className="text-sage-600" />
+          <Droplets size={20} className="text-violet-600" />
           <div className="flex-1">
             <p className="text-xs text-moss-400">Water today</p>
             <p className="text-sm font-medium text-moss-900">

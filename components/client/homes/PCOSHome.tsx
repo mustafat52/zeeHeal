@@ -17,10 +17,10 @@ export function PCOSHome({ client }: { client: Client }) {
 
   return (
     <div>
-      <div className="bg-sage-100 px-6 pt-12 pb-6 rounded-b-[28px]">
+      <div className="bg-rose-50 px-6 pt-12 pb-6 rounded-b-[28px]">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-sage-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
+            <p className="text-rose-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
             <h1 className="font-display text-2xl text-moss-900 mt-0.5">PCOS care plan</h1>
           </div>
           <LogoutButton className="mt-1" />
@@ -29,10 +29,12 @@ export function PCOSHome({ client }: { client: Client }) {
       </div>
 
       <div className="px-5 mt-4 flex flex-col gap-3">
-        <PeriodCalendar
-          clientId={client.id}
-          periodLogs={client.periodLogs ?? []}
-        />
+        <div className="rounded-2xl ring-1 ring-rose-200/70">
+          <PeriodCalendar
+            clientId={client.id}
+            periodLogs={client.periodLogs ?? []}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white rounded-xl border border-sage-100/60 shadow-card p-3.5">
@@ -56,7 +58,7 @@ export function PCOSHome({ client }: { client: Client }) {
         {(todayCheckin?.bloating !== undefined || todayCheckin?.mood !== undefined || todayCheckin?.hairFall !== undefined) && (
           <div className="bg-white rounded-xl border border-sage-100/60 shadow-card p-3.5">
             <p className="text-xs font-medium text-moss-600 mb-2.5 flex items-center gap-1.5">
-              <Activity size={13} /> Today&apos;s symptoms
+              <Activity size={13} className="text-rose-600" /> Today&apos;s symptoms
             </p>
             <div className="flex gap-3 flex-wrap">
               {todayCheckin?.bloating !== undefined && (

@@ -23,10 +23,10 @@ export function WeightLossHome({ client }: { client: Client }) {
 
   return (
     <div>
-      <div className="bg-sage-100 px-6 pt-12 pb-6 rounded-b-[28px]">
+      <div className="bg-amber-50 px-6 pt-12 pb-6 rounded-b-[28px]">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-sage-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
+            <p className="text-amber-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
             <h1 className="font-display text-2xl text-moss-900 mt-0.5">Your weight loss plan</h1>
           </div>
           <LogoutButton className="mt-1" />
@@ -62,13 +62,13 @@ export function WeightLossHome({ client }: { client: Client }) {
           <div className="bg-white rounded-xl border border-sage-100/60 shadow-card p-3.5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium text-moss-600 flex items-center gap-1.5">
-                <Target size={13} /> Goal progress
+                <Target size={13} className="text-amber-600" /> Goal progress
               </p>
               <span className="text-xs text-moss-400">{progressPct}%</span>
             </div>
             <div className="h-2 bg-moss-900/8 rounded-full overflow-hidden">
               <div
-                className="h-full bg-sage-600 rounded-full transition-all duration-700"
+                className="h-full bg-amber-500 rounded-full transition-all duration-700"
                 style={{ width: `${progressPct}%` }}
               />
             </div>
