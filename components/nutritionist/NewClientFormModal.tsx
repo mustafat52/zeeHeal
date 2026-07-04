@@ -4,28 +4,32 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Client, CHECKIN_FIELDS, CheckinConfig, CheckinFieldKey } from "@/lib/mock-data/clients";
+import { Client, ConditionType, CHECKIN_FIELDS, CheckinConfig, CheckinFieldKey } from "@/lib/mock-data/clients";
 import clsx from "clsx";
 
-const presets: { label: string; planType: string; keys: CheckinFieldKey[] }[] = [
+const presets: { label: string; planType: string; condition: ConditionType; keys: CheckinFieldKey[] }[] = [
   {
     label: "Gut health",
     planType: "Gut health reset",
+    condition: "weight-loss", // no dedicated "gut" condition exists yet — closest fit
     keys: ["weight", "sleepHours", "mood", "bloating", "activity", "waterGlasses"],
   },
   {
     label: "PCOS / hormone",
     planType: "PCOS / hormone balance",
+    condition: "pcos",
     keys: ["weight", "sleepHours", "mood", "bloating", "activity", "skinCondition", "hairFall", "cycleDay"],
   },
   {
     label: "Weight loss",
     planType: "Weight loss",
+    condition: "weight-loss",
     keys: ["weight", "sleepHours", "mood", "activity", "waterGlasses"],
   },
   {
     label: "Skin focus",
     planType: "Skin and gut reset",
+    condition: "skincare",
     keys: ["sleepHours", "mood", "skinCondition", "waterGlasses"],
   },
 ];
@@ -49,14 +53,16 @@ export function NewClientFormModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [planType, setPlanType] = useState("");
+  const [condition, setCondition] = useState<ConditionType>("weight-loss");
   const [config, setConfig] = useState<CheckinConfig>({});
 
   function toggle(key: CheckinFieldKey) {
     setConfig((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
-  function applyPreset(preset: { planType: string; keys: CheckinFieldKey[] }) {
+  function applyPreset(preset: { planType: string; condition: ConditionType; keys: CheckinFieldKey[] }) {
     setPlanType(preset.planType);
+    setCondition(preset.condition);
     const next: CheckinConfig = {};
     for (const key of preset.keys) next[key] = true;
     setConfig(next);
@@ -72,11 +78,18 @@ export function NewClientFormModal({
       name: name.trim(),
       initials: initialsFromName(name) || "??",
       phone: phone.trim(),
+      condition,
       planType: planType.trim() || "General nutrition",
       startDate: "Today",
       streak: 0,
       status: "new",
       lastLog: "Just onboarded",
+      planCycle: {
+        cycleNumber: 1,
+        startDate: "Today",
+        currentDay: 1,
+        totalDays: 15,
+      },
       todayPlan: {
         date: "Today",
         meals: [],
@@ -87,6 +100,8 @@ export function NewClientFormModal({
       checkinConfig: config,
     });
   }
+
+  // ...rest of the component (JSX) is unchanged
 
   return (
     <div
