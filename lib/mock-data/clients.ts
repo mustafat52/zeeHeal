@@ -1,5 +1,7 @@
 export type MealStatus = "pending" | "done";
 
+export type ConditionType = "weight-loss" | "pcos" | "hormonal" | "skincare";
+
 export interface MealLog {
   photo?: string;
   note?: string;
@@ -18,6 +20,19 @@ export interface DayPlan {
     reasoning?: string;
   }[];
   water: { current: number; goal: number };
+}
+
+export interface PlanCycle {
+  cycleNumber: number;
+  startDate: string;
+  currentDay: number;
+  totalDays: 15;
+}
+
+export interface PeriodLog {
+  startDate: string;
+  endDate?: string;
+  cycleLength?: number;
 }
 
 export interface DailyCheckin {
@@ -63,11 +78,15 @@ export interface Client {
   name: string;
   initials: string;
   phone: string;
+  condition: ConditionType;
   planType: string;
   startDate: string;
   streak: number;
   status: "on-track" | "needs-attention" | "new";
   lastLog: string;
+  planCycle: PlanCycle;
+  goalWeight?: number;
+  periodLogs?: PeriodLog[];
   todayPlan: DayPlan;
   progress: ProgressPoint[];
   notes: { date: string; text: string }[];
@@ -82,11 +101,13 @@ export const clients: Client[] = [
     name: "Priya Menon",
     initials: "PM",
     phone: "+91 98765 43210",
-    planType: "Gut health reset",
+    condition: "hormonal",
+    planType: "Hormonal balance reset",
     startDate: "2 weeks ago",
     streak: 12,
     status: "on-track",
     lastLog: "2 hours ago",
+    planCycle: { cycleNumber: 2, startDate: "12 days ago", currentDay: 12, totalDays: 15 },
     todayPlan: {
       date: "Today",
       meals: [
@@ -167,11 +188,17 @@ export const clients: Client[] = [
     name: "Ananya Reddy",
     initials: "AR",
     phone: "+91 90123 45678",
+    condition: "pcos",
     planType: "PCOS / hormone balance",
     startDate: "5 weeks ago",
     streak: 3,
     status: "needs-attention",
     lastLog: "3 days ago",
+    planCycle: { cycleNumber: 3, startDate: "8 days ago", currentDay: 8, totalDays: 15 },
+    periodLogs: [
+      { startDate: "22 days ago", endDate: "17 days ago", cycleLength: 5 },
+      { startDate: "3 days ago" },
+    ],
     todayPlan: {
       date: "Today",
       meals: [
@@ -241,11 +268,14 @@ export const clients: Client[] = [
     name: "Fatima Sheikh",
     initials: "FS",
     phone: "+91 99887 76655",
+    condition: "weight-loss",
     planType: "Weight loss",
     startDate: "2 days ago",
     streak: 2,
     status: "new",
     lastLog: "Today",
+    goalWeight: 72,
+    planCycle: { cycleNumber: 1, startDate: "2 days ago", currentDay: 2, totalDays: 15 },
     todayPlan: {
       date: "Today",
       meals: [
@@ -296,6 +326,63 @@ export const clients: Client[] = [
       mood: true,
       activity: true,
       waterGlasses: true,
+    },
+  },
+  {
+    id: "riya",
+    name: "Riya Sharma",
+    initials: "RS",
+    phone: "+91 97654 32109",
+    condition: "skincare",
+    planType: "Skin and gut reset",
+    startDate: "1 week ago",
+    streak: 6,
+    status: "on-track",
+    lastLog: "Today",
+    planCycle: { cycleNumber: 1, startDate: "7 days ago", currentDay: 7, totalDays: 15 },
+    todayPlan: {
+      date: "Today",
+      meals: [
+        {
+          id: "b4", label: "Breakfast", time: "8:00 am",
+          items: "Green smoothie, chia seeds, soaked almonds",
+          status: "done",
+          reasoning: "Antioxidants in the morning help fight inflammation that drives breakouts — especially important for your skin type.",
+        },
+        {
+          id: "l4", label: "Lunch", time: "1:00 pm",
+          items: "Quinoa salad, cucumber, avocado, lemon dressing",
+          status: "pending",
+          reasoning: "Avocado gives you the healthy fats your skin barrier needs. Cucumber keeps you hydrated from inside out.",
+        },
+        {
+          id: "s4", label: "Snack", time: "4:30 pm",
+          items: "Pumpkin seeds, herbal tea",
+          status: "pending",
+          reasoning: "Pumpkin seeds are high in zinc — one of the most clinically backed nutrients for acne reduction.",
+        },
+        {
+          id: "d4", label: "Dinner", time: "7:30 pm",
+          items: "Grilled salmon, steamed broccoli, brown rice",
+          status: "pending",
+          reasoning: "Omega-3s from salmon directly reduce skin inflammation. Broccoli adds vitamin C for collagen support.",
+        },
+      ],
+      water: { current: 4, goal: 10 },
+    },
+    progress: [
+      { week: "W1", weight: 58.0, bloating: 4, energy: 6 },
+    ],
+    notes: [
+      { date: "7 days ago", text: "Hormonal acne along jawline, started low-GI anti-inflammatory plan. No dairy, no refined sugar." },
+    ],
+    monthlyRecap: "Your first week has been great — you logged every day and your skin photos already show less redness around the jawline. The no-dairy rule is the most important one right now, keep it going. Next 15 days we'll add a probiotic protocol to the plan.",
+    checkinConfig: {
+      sleepHours: true,
+      mood: true,
+      skinCondition: true,
+      waterGlasses: true,
+      activity: true,
     },
   },
 ];

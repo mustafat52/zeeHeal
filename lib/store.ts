@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig } from "./mock-data/clients";
+import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog } from "./mock-data/clients";
 
 export type ViewMode = "client" | "nutritionist";
 
@@ -17,6 +17,8 @@ interface AppState {
   addWater: (clientId: string) => void;
   logCheckin: (clientId: string, checkin: DailyCheckin) => void;
   setCheckinConfig: (clientId: string, config: CheckinConfig) => void;
+  logPeriodStart: (clientId: string) => void;
+  logPeriodEnd: (clientId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -90,5 +92,27 @@ export const useAppStore = create<AppState>((set) => ({
       clients: state.clients.map((c) =>
         c.id === clientId ? { ...c, checkinConfig: config } : c
       ),
+    })),
+
+  logPeriodStart: (clientId) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+        const newLog: PeriodLog = { startDate: "Today" };
+        return { ...c, periodLogs: [...(c.periodLogs ?? []), newLog] };
+      }),
+    })),
+
+  logPeriodEnd: (clientId) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+        const logs = [...(c.periodLogs ?? [])];
+        const last = logs[logs.length - 1];
+        if (last && !last.endDate) {
+          logs[logs.length - 1] = { ...last, endDate: "Today" };
+        }
+        return { ...c, periodLogs: logs };
+      }),
     })),
 }));
