@@ -31,7 +31,7 @@ export function WeightLossHome({ client }: { client: Client }) {
           </div>
           <LogoutButton className="mt-1" />
         </div>
-        <PlanCycleBar cycle={client.planCycle} />
+        <PlanCycleBar cycle={client.planCycle} accent="amber" />
       </div>
 
       <div className="px-5 mt-4 flex flex-col gap-3">
@@ -98,7 +98,7 @@ export function WeightLossHome({ client }: { client: Client }) {
           </button>
         </div>
 
-        <CheckinCard client={client} />
+        <CheckinCard client={client} accent="amber" />
         <TodayMeals clientId={client.id} plan={client.todayPlan} />
       </div>
     </div>

@@ -80,7 +80,7 @@ export function PeriodCalendar({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-sage-100/60 shadow-card p-4">
+    <div className="bg-white rounded-xl border border-rose-100/70 shadow-card p-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-medium text-moss-900">Cycle tracker</p>
         <button
@@ -88,8 +88,8 @@ export function PeriodCalendar({
           className={clsx(
             "tap-scale text-xs font-medium px-3 py-1.5 rounded-full",
             hasActiveLog
-              ? "bg-clay-100 text-clay-600"
-              : "bg-sage-100 text-sage-700"
+              ? "bg-rose-100 text-rose-700"
+              : "bg-rose-50 text-rose-600"
           )}
         >
           {hasActiveLog ? "Log period end" : "Log period start"}
@@ -97,8 +97,8 @@ export function PeriodCalendar({
       </div>
 
       {lastLog && (
-        <div className="flex items-center gap-2 mb-3 bg-sage-50 rounded-lg px-3 py-2">
-          <div className="w-2 h-2 rounded-full bg-clay-400 shrink-0" />
+        <div className="flex items-center gap-2 mb-3 bg-rose-50 rounded-lg px-3 py-2">
+          <div className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
           <p className="text-xs text-moss-600">
             {hasActiveLog
               ? `Period started ${lastLog.startDate}`
@@ -137,8 +137,8 @@ export function PeriodCalendar({
               key={day}
               className={clsx(
                 "aspect-square flex items-center justify-center rounded-full text-[11px] font-medium mx-auto w-7 h-7",
-                isPeriod && "bg-clay-400 text-white",
-                isToday && !isPeriod && "bg-sage-100 text-sage-800 font-semibold",
+                isPeriod && "bg-rose-400 text-white",
+                isToday && !isPeriod && "bg-rose-100 text-rose-700 font-semibold",
                 !isPeriod && !isToday && "text-moss-600"
               )}
             >
@@ -182,7 +182,7 @@ export function PeriodCalendar({
                   else logPeriodStart(clientId);
                   setShowModal(false);
                 }}
-                className="tap-scale w-full flex items-center justify-center gap-2 bg-clay-400 text-white rounded-xl py-3.5 text-sm font-medium"
+                className="tap-scale w-full flex items-center justify-center gap-2 bg-rose-500 text-white rounded-xl py-3.5 text-sm font-medium"
               >
                 <Check size={16} />
                 {hasActiveLog ? "Confirm period end" : "Confirm period start"}

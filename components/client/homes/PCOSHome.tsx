@@ -25,16 +25,14 @@ export function PCOSHome({ client }: { client: Client }) {
           </div>
           <LogoutButton className="mt-1" />
         </div>
-        <PlanCycleBar cycle={client.planCycle} />
+        <PlanCycleBar cycle={client.planCycle} accent="rose" />
       </div>
 
       <div className="px-5 mt-4 flex flex-col gap-3">
-        <div className="rounded-2xl ring-1 ring-rose-200/70">
-          <PeriodCalendar
-            clientId={client.id}
-            periodLogs={client.periodLogs ?? []}
-          />
-        </div>
+        <PeriodCalendar
+          clientId={client.id}
+          periodLogs={client.periodLogs ?? []}
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white rounded-xl border border-sage-100/60 shadow-card p-3.5">
@@ -89,7 +87,7 @@ export function PCOSHome({ client }: { client: Client }) {
           </div>
         )}
 
-        <CheckinCard client={client} />
+        <CheckinCard client={client} accent="rose" />
         <TodayMeals clientId={client.id} plan={client.todayPlan} />
       </div>
     </div>

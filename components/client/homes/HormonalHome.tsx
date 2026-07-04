@@ -48,7 +48,7 @@ export function HormonalHome({ client }: { client: Client }) {
           </div>
           <LogoutButton className="mt-1" />
         </div>
-        <PlanCycleBar cycle={client.planCycle} />
+        <PlanCycleBar cycle={client.planCycle} accent="violet" />
       </div>
 
       <div className="px-5 mt-4 flex flex-col gap-3">
@@ -118,7 +118,7 @@ export function HormonalHome({ client }: { client: Client }) {
           </div>
         </button>
 
-        <CheckinCard client={client} />
+        <CheckinCard client={client} accent="violet" />
         <TodayMeals clientId={client.id} plan={client.todayPlan} />
       </div>
     </div>
