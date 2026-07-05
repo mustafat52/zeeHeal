@@ -89,8 +89,8 @@ export interface Client {
   status: "on-track" | "needs-attention" | "new";
   lastLog: string;
   planCycle: PlanCycle;
-  /** How many months the client signed up for with Zainab (approx 30-day months). */
-  programDurationMonths: number;
+  /** How many months the client signed up for with Zainab (approx 30-day months). Optional until set during onboarding. */
+  programDurationMonths?: number;
   /**
    * Day-by-day check-in history for the CURRENT cycle only.
    * Index 0 = Day 1 of the current cycle. Length is always 15 (totalDays).

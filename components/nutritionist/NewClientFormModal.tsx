@@ -34,6 +34,8 @@ const presets: { label: string; planType: string; condition: ConditionType; keys
   },
 ];
 
+const durationPresets = [1, 3, 6, 12];
+
 function initialsFromName(name: string) {
   return name
     .trim()
@@ -55,6 +57,7 @@ export function NewClientFormModal({
   const [planType, setPlanType] = useState("");
   const [condition, setCondition] = useState<ConditionType>("weight-loss");
   const [config, setConfig] = useState<CheckinConfig>({});
+  const [programDurationMonths, setProgramDurationMonths] = useState<number | null>(null);
 
   function toggle(key: CheckinFieldKey) {
     setConfig((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -90,6 +93,7 @@ export function NewClientFormModal({
         currentDay: 1,
         totalDays: 15,
       },
+      programDurationMonths: programDurationMonths ?? undefined,
       todayPlan: {
         date: "Today",
         meals: [],
@@ -100,8 +104,6 @@ export function NewClientFormModal({
       checkinConfig: config,
     });
   }
-
-  // ...rest of the component (JSX) is unchanged
 
   return (
     <div
@@ -164,6 +166,38 @@ export function NewClientFormModal({
           value={planType}
           onChange={(e) => setPlanType(e.target.value)}
           placeholder="Plan name, e.g. Gut health reset"
+          className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-5"
+        />
+
+        <p className="text-xs font-medium text-moss-600 mb-1.5">Program length</p>
+        <p className="text-[11px] text-moss-400 mb-2.5">
+          How long has this client signed up for? Shows on their cycle reports so you can track overall progress, not just per-cycle.
+        </p>
+        <div className="flex flex-wrap gap-2 mb-2.5">
+          {durationPresets.map((m) => (
+            <button
+              key={m}
+              onClick={() => setProgramDurationMonths(m)}
+              className={clsx(
+                "tap-scale px-3 py-1.5 rounded-full text-xs font-medium border",
+                programDurationMonths === m
+                  ? "bg-sage-600 text-white border-sage-600"
+                  : "bg-white text-moss-600 border-sage-100"
+              )}
+            >
+              {m} month{m > 1 ? "s" : ""}
+            </button>
+          ))}
+        </div>
+        <input
+          type="number"
+          min={1}
+          value={programDurationMonths ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            setProgramDurationMonths(v === "" ? null : Math.max(1, Number(v)));
+          }}
+          placeholder="Or enter a custom number of months"
           className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-5"
         />
 
