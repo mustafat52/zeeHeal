@@ -4,11 +4,13 @@ import { Client } from "@/lib/mock-data/clients";
 import { Calendar } from "lucide-react";
 
 export function PatientProfileCard({ client }: { client: Client }) {
-  const totalProgramDays = client.programDurationMonths * 30;
-  const elapsedDays = (client.planCycle.cycleNumber - 1) * 15 + client.planCycle.currentDay;
-  const programPct = Math.min(100, Math.round((elapsedDays / totalProgramDays) * 100));
-  const totalCyclesInProgram = Math.ceil(totalProgramDays / 15);
+  const hasProgramLength = client.programDurationMonths !== undefined;
   const cyclesCompleted = client.planCycle.cycleNumber - 1;
+
+  const totalProgramDays = hasProgramLength ? client.programDurationMonths! * 30 : null;
+  const elapsedDays = cyclesCompleted * 15 + client.planCycle.currentDay;
+  const programPct = totalProgramDays ? Math.min(100, Math.round((elapsedDays / totalProgramDays) * 100)) : null;
+  const totalCyclesInProgram = totalProgramDays ? Math.ceil(totalProgramDays / 15) : null;
 
   return (
     <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
@@ -25,23 +27,33 @@ export function PatientProfileCard({ client }: { client: Client }) {
         <div>
           <p className="text-[10px] text-moss-400">Program length</p>
           <p className="text-sm font-medium text-moss-900">
-            {client.programDurationMonths} month{client.programDurationMonths > 1 ? "s" : ""}
+            {hasProgramLength
+              ? `${client.programDurationMonths} month${client.programDurationMonths! > 1 ? "s" : ""}`
+              : "Not set"}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] text-moss-600">
-          Cycle {client.planCycle.cycleNumber} of ~{totalCyclesInProgram}
-        </span>
-        <span className="text-[11px] text-moss-400">{programPct}% of program</span>
-      </div>
-      <div className="h-1.5 bg-moss-900/10 rounded-full overflow-hidden">
-        <div className="h-full bg-sage-600 rounded-full transition-all duration-500" style={{ width: `${programPct}%` }} />
-      </div>
-      <p className="text-[10px] text-moss-400 mt-1">
-        ~{elapsedDays} of ~{totalProgramDays} days · {cyclesCompleted} full cycle{cyclesCompleted === 1 ? "" : "s"} completed
-      </p>
+      {hasProgramLength ? (
+        <>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] text-moss-600">
+              Cycle {client.planCycle.cycleNumber} of ~{totalCyclesInProgram}
+            </span>
+            <span className="text-[11px] text-moss-400">{programPct}% of program</span>
+          </div>
+          <div className="h-1.5 bg-moss-900/10 rounded-full overflow-hidden">
+            <div className="h-full bg-sage-600 rounded-full transition-all duration-500" style={{ width: `${programPct}%` }} />
+          </div>
+          <p className="text-[10px] text-moss-400 mt-1">
+            ~{elapsedDays} of ~{totalProgramDays} days · {cyclesCompleted} full cycle{cyclesCompleted === 1 ? "" : "s"} completed
+          </p>
+        </>
+      ) : (
+        <p className="text-[11px] text-moss-400">
+          Cycle {client.planCycle.cycleNumber} · {cyclesCompleted} full cycle{cyclesCompleted === 1 ? "" : "s"} completed · program length not set for this client yet
+        </p>
+      )}
     </div>
   );
 }
