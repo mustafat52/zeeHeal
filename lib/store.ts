@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog, FlowIntensity } from "./mock-data/clients";
+import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog, FlowIntensity, CycleSnapshot } from "./mock-data/clients";
 
 export type ViewMode = "client" | "nutritionist";
 
@@ -156,16 +156,25 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       clients: state.clients.map((c) => {
         if (c.id !== clientId) return c;
+
+        const completedCycle: CycleSnapshot = {
+          cycleNumber: c.planCycle.cycleNumber,
+          startDate: c.planCycle.startDate,
+          checkinHistory: c.checkinHistory ?? Array.from({ length: 15 }, () => null),
+          streakAtEnd: c.streak,
+        };
+
         return {
           ...c,
+          cycleHistory: [...(c.cycleHistory ?? []), completedCycle],
           planCycle: {
             cycleNumber: c.planCycle.cycleNumber + 1,
             startDate: "Today",
             currentDay: 1,
             totalDays: 15,
           },
-          // Fresh cycle, fresh history — last cycle's data lives in the
-          // report the nutritionist just reviewed, not carried forward.
+          // Fresh cycle, fresh live history — the just-finished cycle now
+          // lives in cycleHistory instead of being discarded.
           checkinHistory: Array.from({ length: 15 }, () => null),
         };
       }),

@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/Button";
 import { PrepSheetModal } from "@/components/nutritionist/PrepSheetModal";
 import { ClientProfileFormModal } from "@/components/nutritionist/ClientProfileFormModal";
 import { CycleReportModal } from "@/components/nutritionist/CycleReportModal";
+import { PlanHistoryModal } from "@/components/nutritionist/PlanHistoryModal";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText } from "lucide-react";
+import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History } from "lucide-react";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -23,6 +24,7 @@ export default function ClientDetailPage() {
   const [showPrepSheet, setShowPrepSheet] = useState(false);
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [showCycleReport, setShowCycleReport] = useState(false);
+  const [showPlanHistory, setShowPlanHistory] = useState(false);
 
   if (!client) return null;
 
@@ -72,6 +74,16 @@ export default function ClientDetailPage() {
           </p>
         </div>
       </button>
+
+      {client.cycleHistory && client.cycleHistory.length > 0 && (
+        <button
+          onClick={() => setShowPlanHistory(true)}
+          className="tap-scale flex items-center gap-1.5 text-xs text-moss-600 mb-5"
+        >
+          <History size={13} />
+          View past cycles ({client.cycleHistory.length})
+        </button>
+      )}
 
       <div className="flex gap-2.5 mb-5">
         <button
@@ -230,6 +242,9 @@ export default function ClientDetailPage() {
               setShowCycleReport(false);
             }}
           />
+        )}
+        {showPlanHistory && (
+          <PlanHistoryModal client={client} onClose={() => setShowPlanHistory(false)} />
         )}
       </AnimatePresence>
     </div>

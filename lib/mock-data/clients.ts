@@ -29,6 +29,20 @@ export interface PlanCycle {
   totalDays: 15;
 }
 
+/**
+ * A frozen record of a completed cycle, archived by renewPlanCycle right
+ * before it resets the live checkinHistory. periodLogs are NOT duplicated
+ * here — they're never deleted from the client, so a past cycle's period
+ * flow can always be reconstructed later from periodLogs + this snapshot's
+ * startDate via buildFlowDataForCycle.
+ */
+export interface CycleSnapshot {
+  cycleNumber: number;
+  startDate: string;
+  checkinHistory: (DailyCheckin | null)[];
+  streakAtEnd: number;
+}
+
 export type FlowIntensity = "light" | "medium" | "heavy";
 
 export interface PeriodLog {
@@ -98,6 +112,8 @@ export interface Client {
    * Resets to all-null when a new cycle starts via renewPlanCycle.
    */
   checkinHistory?: (DailyCheckin | null)[];
+  /** Archived record of every completed cycle, oldest first. */
+  cycleHistory?: CycleSnapshot[];
   goalWeight?: number;
   periodLogs?: PeriodLog[];
   todayPlan: DayPlan;
@@ -122,6 +138,30 @@ export const clients: Client[] = [
     lastLog: "2 hours ago",
     planCycle: { cycleNumber: 2, startDate: "12 days ago", currentDay: 12, totalDays: 15 },
     programDurationMonths: 3,
+    cycleHistory: [
+      {
+        cycleNumber: 1,
+        startDate: "27 days ago",
+        streakAtEnd: 14,
+        checkinHistory: [
+          { mood: 3, sleepHours: 6, waterGlasses: 4, activityType: "None", activityMinutes: 0, weight: 70.5, bloating: 7 },
+          { mood: 3, sleepHours: 6.5, waterGlasses: 5, activityType: "Walk", activityMinutes: 15, weight: 70.3, bloating: 7 },
+          { mood: 4, sleepHours: 7, waterGlasses: 5, activityType: "Walk", activityMinutes: 20, weight: 70.1, bloating: 6 },
+          { mood: 3, sleepHours: 6, waterGlasses: 4, activityType: "None", activityMinutes: 0, weight: 70.0, bloating: 7 },
+          { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 20, weight: 69.9, bloating: 6 },
+          { mood: 4, sleepHours: 7.5, waterGlasses: 6, activityType: "Yoga", activityMinutes: 25, weight: 69.8, bloating: 5 },
+          { mood: 5, sleepHours: 8, waterGlasses: 7, activityType: "Walk", activityMinutes: 25, weight: 69.7, bloating: 5 },
+          { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 15, weight: 69.6, bloating: 5 },
+          null,
+          { mood: 3, sleepHours: 6, waterGlasses: 5, activityType: "None", activityMinutes: 0, weight: 69.6, bloating: 6 },
+          { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 20, weight: 69.5, bloating: 5 },
+          { mood: 4, sleepHours: 7.5, waterGlasses: 7, activityType: "Walk", activityMinutes: 25, weight: 69.5, bloating: 5 },
+          { mood: 5, sleepHours: 8, waterGlasses: 7, activityType: "Yoga", activityMinutes: 30, weight: 69.4, bloating: 4 },
+          { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 20, weight: 69.4, bloating: 4 },
+          { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 20, weight: 69.4, bloating: 4 },
+        ],
+      },
+    ],
     checkinHistory: [
       { mood: 3, sleepHours: 6.5, waterGlasses: 5, activityType: "Walk", activityMinutes: 15, weight: 69.4, bloating: 5 },
       { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 20, weight: 69.3, bloating: 5 },
