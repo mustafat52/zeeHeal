@@ -10,7 +10,7 @@ import { NewClientFormModal } from "@/components/nutritionist/NewClientFormModal
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { generateDigest } from "@/lib/digest";
 import { AnimatePresence } from "framer-motion";
-import { AlertCircle, ChevronRight, Search, Plus } from "lucide-react";
+import { AlertCircle, ChevronRight, Search, Plus, RefreshCw } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   "on-track": "On track",
@@ -25,6 +25,9 @@ export default function NutritionistDashboardPage() {
   const [showNewClientForm, setShowNewClientForm] = useState(false);
 
   const needsAttention = clients.filter((c) => c.status === "needs-attention").length;
+  const cycleReviewDue = clients.filter(
+    (c) => c.planCycle.totalDays - c.planCycle.currentDay <= 3
+  ).length;
   const digestItems = generateDigest(clients);
 
   const filteredClients = clients.filter((c) =>
@@ -52,6 +55,18 @@ export default function NutritionistDashboardPage() {
             <p className="font-display text-2xl text-clay-600 mt-1">{needsAttention}</p>
           </div>
         </div>
+
+        {cycleReviewDue > 0 && (
+          <div className="mt-3 bg-white/70 rounded-xl p-3 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-clay-100 flex items-center justify-center shrink-0">
+              <RefreshCw size={13} className="text-clay-600" />
+            </div>
+            <p className="text-xs text-moss-700">
+              <span className="font-medium text-clay-600">{cycleReviewDue}</span>{" "}
+              {cycleReviewDue === 1 ? "client is" : "clients are"} due for a 15-day plan review
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="px-5 -mt-3">
@@ -84,32 +99,46 @@ export default function NutritionistDashboardPage() {
         </div>
 
         <div className="flex flex-col gap-2.5">
-          {filteredClients.map((client) => (
-            <Link key={client.id} href={`/client/${client.id}`}>
-              <Card className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-sage-100 flex items-center justify-center font-medium text-sage-800 shrink-0">
-                  {client.initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-moss-900 text-sm">{client.name}</p>
-                  <p className="text-xs text-moss-400 truncate">{client.planType}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  {client.status === "needs-attention" ? (
-                    <span className="flex items-center gap-1 text-xs text-clay-600 font-medium">
-                      <AlertCircle size={12} /> {statusLabel[client.status]}
+          {filteredClients.map((client) => {
+            const daysLeft = client.planCycle.totalDays - client.planCycle.currentDay;
+            const nearEnd = daysLeft <= 3;
+
+            return (
+              <Link key={client.id} href={`/client/${client.id}`}>
+                <Card className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full bg-sage-100 flex items-center justify-center font-medium text-sage-800 shrink-0">
+                    {client.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-moss-900 text-sm">{client.name}</p>
+                    <p className="text-xs text-moss-400 truncate">{client.planType}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {client.status === "needs-attention" ? (
+                      <span className="flex items-center gap-1 text-xs text-clay-600 font-medium">
+                        <AlertCircle size={12} /> {statusLabel[client.status]}
+                      </span>
+                    ) : (
+                      <Pill tone={client.status === "new" ? "neutral" : "sage"}>
+                        {statusLabel[client.status]}
+                      </Pill>
+                    )}
+                    <span className="text-[11px] text-moss-400">{client.lastLog}</span>
+                    <span
+                      className={
+                        nearEnd
+                          ? "text-[10px] font-medium text-clay-600 bg-clay-100 px-2 py-0.5 rounded-full"
+                          : "text-[10px] text-moss-400"
+                      }
+                    >
+                      Day {client.planCycle.currentDay}/15{nearEnd ? " · Review due" : ""}
                     </span>
-                  ) : (
-                    <Pill tone={client.status === "new" ? "neutral" : "sage"}>
-                      {statusLabel[client.status]}
-                    </Pill>
-                  )}
-                  <span className="text-[11px] text-moss-400">{client.lastLog}</span>
-                </div>
-                <ChevronRight size={16} className="text-moss-400 shrink-0" />
-              </Card>
-            </Link>
-          ))}
+                  </div>
+                  <ChevronRight size={16} className="text-moss-400 shrink-0" />
+                </Card>
+              </Link>
+            );
+          })}
 
           {filteredClients.length === 0 && (
             <p className="text-sm text-moss-400 text-center py-8">No clients match &quot;{query}&quot;</p>

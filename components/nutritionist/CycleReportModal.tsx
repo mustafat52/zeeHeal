@@ -1,0 +1,201 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { Client } from "@/lib/mock-data/clients";
+import { PatientProfileCard } from "./PatientProfileCard";
+import { DailyBarStrip } from "./DailyBarStrip";
+import { PeriodFlowStrip } from "./PeriodFlowStrip";
+import { buildFlowDataForCycle } from "@/lib/period";
+import { X, TrendingDown, TrendingUp, Minus, Droplets, Target } from "lucide-react";
+
+function trendIcon(change: number) {
+  if (change < -0.2) return TrendingDown;
+  if (change > 0.2) return TrendingUp;
+  return Minus;
+}
+
+export function CycleReportModal({
+  client,
+  onClose,
+  onRenew,
+}: {
+  client: Client;
+  onClose: () => void;
+  onRenew: () => void;
+}) {
+  const progress = client.progress;
+  const first = progress[0];
+  const last = progress[progress.length - 1];
+  const weightChange = last.weight - first.weight;
+  const bloatingChange = last.bloating - first.bloating;
+  const energyChange = last.energy - first.energy;
+
+  const WeightTrend = trendIcon(weightChange);
+  const BloatTrend = trendIcon(bloatingChange);
+  const EnergyTrend = trendIcon(energyChange);
+
+  const { cycleNumber, currentDay, totalDays } = client.planCycle;
+  const history = client.checkinHistory ?? Array.from({ length: totalDays }, () => null);
+
+  const loggedThisCycle = history
+    .slice(0, currentDay)
+    .filter((h) => h !== null).length;
+
+  const sleepData = history.map((h) => h?.sleepHours ?? null);
+  const waterData = history.map((h) => h?.waterGlasses ?? null);
+  const activityData = history.map((h) => h?.activityMinutes ?? null);
+  const moodData = history.map((h) => h?.mood ?? null);
+  const skinData = history.map((h) => h?.skinCondition ?? null);
+  const flowData = buildFlowDataForCycle(client.periodLogs, client.planCycle.startDate, totalDays);
+  const hasFlowLogged = flowData.some((v) => v !== null);
+
+  return (
+    <div
+      style={{ minHeight: "100vh" }}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-moss-900/40"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-ivory rounded-t-[28px] px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+24px)] max-h-[88vh] overflow-y-auto no-scrollbar"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs font-medium text-moss-400">
+            Cycle {cycleNumber} review · Day {currentDay} of {totalDays}
+          </p>
+          <button onClick={onClose} className="tap-scale w-8 h-8 rounded-full bg-white flex items-center justify-center" aria-label="Close">
+            <X size={16} className="text-moss-600" />
+          </button>
+        </div>
+        <h2 className="font-display text-2xl text-moss-900 mb-4">{client.name}</h2>
+
+        <PatientProfileCard client={client} />
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5">
+            <p className="text-xs text-moss-400 mb-1">Streak</p>
+            <p className="font-display text-xl text-moss-900">{client.streak} days</p>
+          </div>
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5">
+            <p className="text-xs text-moss-400 mb-1">Logged this cycle</p>
+            <p className="font-display text-xl text-moss-900">
+              {loggedThisCycle}/{currentDay}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
+          <p className="text-xs font-medium text-moss-600 mb-3">Since {client.startDate}</p>
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-sm text-moss-900">Weight</span>
+            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+              <WeightTrend
+                size={13}
+                className={weightChange < 0 ? "text-sage-600" : weightChange > 0 ? "text-clay-600" : "text-moss-400"}
+              />
+              {Math.abs(weightChange).toFixed(1)} kg {weightChange < 0 ? "down" : weightChange > 0 ? "up" : "no change"}
+            </span>
+          </div>
+          <div className="h-px bg-sage-100" />
+          <div className="flex items-center justify-between py-1.5 pt-2.5">
+            <span className="text-sm text-moss-900">Bloating</span>
+            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+              <BloatTrend
+                size={13}
+                className={bloatingChange < 0 ? "text-sage-600" : bloatingChange > 0 ? "text-clay-600" : "text-moss-400"}
+              />
+              {bloatingChange < 0 ? "Improving" : bloatingChange > 0 ? "Worsening" : "Stable"}
+            </span>
+          </div>
+          <div className="h-px bg-sage-100" />
+          <div className="flex items-center justify-between py-1.5 pt-2.5">
+            <span className="text-sm text-moss-900">Energy</span>
+            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+              <EnergyTrend
+                size={13}
+                className={energyChange > 0 ? "text-sage-600" : energyChange < 0 ? "text-clay-600" : "text-moss-400"}
+              />
+              {energyChange > 0 ? "Improving" : energyChange < 0 ? "Dropping" : "Stable"}
+            </span>
+          </div>
+        </div>
+
+        {client.condition === "weight-loss" && client.goalWeight !== undefined && (
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <Target size={14} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs text-moss-400">Goal weight</p>
+              <p className="text-sm font-medium text-moss-900">
+                {last.weight} kg now · {Math.max(last.weight - client.goalWeight, 0).toFixed(1)} kg to {client.goalWeight} kg
+              </p>
+            </div>
+          </div>
+        )}
+
+        {client.condition === "pcos" && (
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+              <Droplets size={14} className="text-rose-600" />
+            </div>
+            <div>
+              <p className="text-xs text-moss-400">Period logs</p>
+              <p className="text-sm font-medium text-moss-900">
+                {client.periodLogs?.length ?? 0} logged
+                {client.periodLogs && client.periodLogs.length > 0 && !client.periodLogs[client.periodLogs.length - 1].endDate
+                  ? " · period currently active"
+                  : ""}
+              </p>
+              <p className="text-[10px] text-moss-400 mt-0.5">
+                {hasFlowLogged ? "See daily flow chart below" : "No flow entries logged this cycle yet"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs font-medium text-moss-600 mb-2">This cycle, day by day</p>
+
+        <DailyBarStrip label="Sleep (hrs)" data={sleepData} totalDays={totalDays} max={9} colorClass="bg-violet-300" />
+        <DailyBarStrip label="Water (glasses)" data={waterData} totalDays={totalDays} max={client.todayPlan.water.goal} colorClass="bg-sage-400" />
+
+        {client.condition === "weight-loss" && (
+          <DailyBarStrip label="Activity (minutes)" data={activityData} totalDays={totalDays} max={40} colorClass="bg-amber-400" />
+        )}
+        {(client.condition === "pcos" || client.condition === "hormonal") && (
+          <DailyBarStrip label="Mood (1–5)" data={moodData} totalDays={totalDays} max={5} colorClass={client.condition === "pcos" ? "bg-rose-400" : "bg-violet-500"} />
+        )}
+        {client.condition === "pcos" && (
+          <PeriodFlowStrip data={flowData} totalDays={totalDays} />
+        )}
+        {client.condition === "skincare" && (
+          <DailyBarStrip label="Skin condition (0–10, lower is clearer)" data={skinData} totalDays={totalDays} max={10} colorClass="bg-teal-400" />
+        )}
+
+        <p className="text-xs font-medium text-moss-600 mb-2 mt-2">Recent notes</p>
+        <div className="flex flex-col gap-2 mb-5">
+          {client.notes.slice(0, 5).map((note, i) => (
+            <div key={i} className="bg-white rounded-xl border border-sage-100/60 p-3">
+              <p className="text-[11px] text-moss-400 mb-0.5">{note.date}</p>
+              <p className="text-sm text-moss-900">{note.text}</p>
+            </div>
+          ))}
+          {client.notes.length === 0 && (
+            <p className="text-xs text-moss-400">No session notes yet.</p>
+          )}
+        </div>
+
+        <button
+          onClick={onRenew}
+          className="tap-scale w-full flex items-center justify-center gap-2 bg-clay-600 text-white rounded-xl py-3.5 text-sm font-medium"
+        >
+          Start cycle {cycleNumber + 1}
+        </button>
+      </motion.div>
+    </div>
+  );
+}

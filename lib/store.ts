@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog } from "./mock-data/clients";
+import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog, FlowIntensity } from "./mock-data/clients";
 
 export type ViewMode = "client" | "nutritionist";
 
@@ -19,6 +19,8 @@ interface AppState {
   setCheckinConfig: (clientId: string, config: CheckinConfig) => void;
   logPeriodStart: (clientId: string) => void;
   logPeriodEnd: (clientId: string) => void;
+  logPeriodFlow: (clientId: string, intensity: FlowIntensity) => void;
+  renewPlanCycle: (clientId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -79,10 +81,24 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       clients: state.clients.map((c) => {
         if (c.id !== clientId) return c;
+
+        // Write into the current cycle day's slot in checkinHistory so the
+        // Cycle Report has real data for "today", not just the overwritten
+        // todayCheckin snapshot.
+        const totalDays = c.planCycle.totalDays;
+        const history = c.checkinHistory
+          ? [...c.checkinHistory]
+          : Array.from({ length: totalDays }, () => null);
+        const dayIndex = c.planCycle.currentDay - 1;
+        if (dayIndex >= 0 && dayIndex < history.length) {
+          history[dayIndex] = { ...checkin, loggedAt: "Just now" };
+        }
+
         return {
           ...c,
           lastLog: "Just now",
           todayCheckin: { ...checkin, loggedAt: "Just now" },
+          checkinHistory: history,
         };
       }),
     })),
@@ -113,6 +129,45 @@ export const useAppStore = create<AppState>((set) => ({
           logs[logs.length - 1] = { ...last, endDate: "Today" };
         }
         return { ...c, periodLogs: logs };
+      }),
+    })),
+
+  logPeriodFlow: (clientId, intensity) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+        const logs = [...(c.periodLogs ?? [])];
+        const lastIdx = logs.length - 1;
+        if (lastIdx < 0 || logs[lastIdx].endDate) return c; // no active period to log against
+        const last = logs[lastIdx];
+        const dailyFlow = [...(last.dailyFlow ?? [])];
+        const todayIdx = dailyFlow.findIndex((f) => f.date === "Today");
+        if (todayIdx >= 0) {
+          dailyFlow[todayIdx] = { date: "Today", intensity };
+        } else {
+          dailyFlow.push({ date: "Today", intensity });
+        }
+        logs[lastIdx] = { ...last, dailyFlow };
+        return { ...c, periodLogs: logs };
+      }),
+    })),
+
+  renewPlanCycle: (clientId) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+        return {
+          ...c,
+          planCycle: {
+            cycleNumber: c.planCycle.cycleNumber + 1,
+            startDate: "Today",
+            currentDay: 1,
+            totalDays: 15,
+          },
+          // Fresh cycle, fresh history — last cycle's data lives in the
+          // report the nutritionist just reviewed, not carried forward.
+          checkinHistory: Array.from({ length: 15 }, () => null),
+        };
       }),
     })),
 }));

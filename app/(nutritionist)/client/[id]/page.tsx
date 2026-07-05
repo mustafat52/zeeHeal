@@ -8,9 +8,10 @@ import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { PrepSheetModal } from "@/components/nutritionist/PrepSheetModal";
 import { ClientProfileFormModal } from "@/components/nutritionist/ClientProfileFormModal";
+import { CycleReportModal } from "@/components/nutritionist/CycleReportModal";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone } from "lucide-react";
+import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText } from "lucide-react";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -18,13 +19,17 @@ export default function ClientDetailPage() {
   const clientId = params.id as string;
   const client = useAppStore((s) => s.clients.find((c) => c.id === clientId));
   const setCheckinConfig = useAppStore((s) => s.setCheckinConfig);
+  const renewPlanCycle = useAppStore((s) => s.renewPlanCycle);
   const [showPrepSheet, setShowPrepSheet] = useState(false);
   const [showProfileForm, setShowProfileForm] = useState(false);
+  const [showCycleReport, setShowCycleReport] = useState(false);
 
   if (!client) return null;
 
   const doneToday = client.todayPlan.meals.filter((m) => m.status === "done").length;
   const configuredCount = Object.values(client.checkinConfig ?? {}).filter(Boolean).length;
+  const daysLeft = client.planCycle.totalDays - client.planCycle.currentDay;
+  const cycleNearEnd = daysLeft <= 3;
 
   return (
     <div className="pt-12 px-5">
@@ -42,6 +47,31 @@ export default function ClientDetailPage() {
           <p className="text-xs text-moss-400 mt-1">{client.phone}</p>
         </div>
       </div>
+
+      <button
+        onClick={() => setShowCycleReport(true)}
+        className={`tap-scale w-full flex items-center gap-3 rounded-xl p-3.5 mb-2.5 ${
+          cycleNearEnd ? "bg-clay-600" : "bg-white border border-sage-100/60 shadow-card"
+        }`}
+      >
+        <div
+          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+            cycleNearEnd ? "bg-white/20" : "bg-clay-100"
+          }`}
+        >
+          <FileText size={16} className={cycleNearEnd ? "text-white" : "text-clay-600"} />
+        </div>
+        <div className="text-left flex-1">
+          <p className={`text-sm font-medium ${cycleNearEnd ? "text-white" : "text-moss-900"}`}>
+            Cycle {client.planCycle.cycleNumber} review
+          </p>
+          <p className={`text-xs ${cycleNearEnd ? "text-white/80" : "text-moss-400"}`}>
+            {cycleNearEnd
+              ? `Day ${client.planCycle.currentDay} of 15 · review due`
+              : `Day ${client.planCycle.currentDay} of 15`}
+          </p>
+        </div>
+      </button>
 
       <div className="flex gap-2.5 mb-5">
         <button
@@ -188,6 +218,16 @@ export default function ClientDetailPage() {
             onSave={(config) => {
               setCheckinConfig(client.id, config);
               setShowProfileForm(false);
+            }}
+          />
+        )}
+        {showCycleReport && (
+          <CycleReportModal
+            client={client}
+            onClose={() => setShowCycleReport(false)}
+            onRenew={() => {
+              renewPlanCycle(client.id);
+              setShowCycleReport(false);
             }}
           />
         )}

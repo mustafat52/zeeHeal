@@ -56,6 +56,7 @@ export function PeriodCalendar({
 }) {
   const logPeriodStart = useAppStore((s) => s.logPeriodStart);
   const logPeriodEnd = useAppStore((s) => s.logPeriodEnd);
+  const logPeriodFlow = useAppStore((s) => s.logPeriodFlow);
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -104,6 +105,33 @@ export function PeriodCalendar({
               ? `Period started ${lastLog.startDate}`
               : `Last period: ${lastLog.startDate}${lastLog.endDate ? ` – ${lastLog.endDate}` : ""}`}
           </p>
+        </div>
+      )}
+
+      {hasActiveLog && (
+        <div className="mb-3">
+          <p className="text-[11px] font-medium text-moss-500 mb-1.5">Today&apos;s flow</p>
+          <div className="flex gap-2">
+            {(["light", "medium", "heavy"] as const).map((level) => {
+              const todaysFlow = lastLog?.dailyFlow?.find((f) => f.date === "Today")?.intensity;
+              const selected = todaysFlow === level;
+              return (
+                <button
+                  key={level}
+                  onClick={() => logPeriodFlow(clientId, level)}
+                  className={clsx(
+                    "tap-scale flex-1 py-1.5 rounded-lg text-[11px] font-medium capitalize border",
+                    selected && level === "light" && "bg-rose-200 border-rose-200 text-rose-800",
+                    selected && level === "medium" && "bg-rose-400 border-rose-400 text-white",
+                    selected && level === "heavy" && "bg-rose-600 border-rose-600 text-white",
+                    !selected && "bg-white border-sage-100 text-moss-600"
+                  )}
+                >
+                  {level}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

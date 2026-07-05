@@ -29,10 +29,14 @@ export interface PlanCycle {
   totalDays: 15;
 }
 
+export type FlowIntensity = "light" | "medium" | "heavy";
+
 export interface PeriodLog {
   startDate: string;
   endDate?: string;
   cycleLength?: number;
+  /** Day-by-day flow intensity logged while this period is active. */
+  dailyFlow?: { date: string; intensity: FlowIntensity }[];
 }
 
 export interface DailyCheckin {
@@ -85,6 +89,15 @@ export interface Client {
   status: "on-track" | "needs-attention" | "new";
   lastLog: string;
   planCycle: PlanCycle;
+  /** How many months the client signed up for with Zainab (approx 30-day months). */
+  programDurationMonths: number;
+  /**
+   * Day-by-day check-in history for the CURRENT cycle only.
+   * Index 0 = Day 1 of the current cycle. Length is always 15 (totalDays).
+   * `null` means the client did not check in that day (used to visualize consistency).
+   * Resets to all-null when a new cycle starts via renewPlanCycle.
+   */
+  checkinHistory?: (DailyCheckin | null)[];
   goalWeight?: number;
   periodLogs?: PeriodLog[];
   todayPlan: DayPlan;
@@ -108,6 +121,24 @@ export const clients: Client[] = [
     status: "on-track",
     lastLog: "2 hours ago",
     planCycle: { cycleNumber: 2, startDate: "12 days ago", currentDay: 12, totalDays: 15 },
+    programDurationMonths: 3,
+    checkinHistory: [
+      { mood: 3, sleepHours: 6.5, waterGlasses: 5, activityType: "Walk", activityMinutes: 15, weight: 69.4, bloating: 5 },
+      { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 20, weight: 69.3, bloating: 5 },
+      { mood: 4, sleepHours: 6, waterGlasses: 5, activityType: "None", activityMinutes: 0, weight: 69.1, bloating: 4 },
+      { mood: 3, sleepHours: 7.5, waterGlasses: 7, activityType: "Walk", activityMinutes: 25, weight: 69.0, bloating: 4 },
+      { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 20, weight: 68.9, bloating: 4 },
+      { mood: 5, sleepHours: 8, waterGlasses: 8, activityType: "Yoga", activityMinutes: 30, weight: 68.8, bloating: 3 },
+      { mood: 4, sleepHours: 7, waterGlasses: 6, activityType: "Walk", activityMinutes: 15, weight: 68.7, bloating: 3 },
+      { mood: 3, sleepHours: 6, waterGlasses: 5, activityType: "None", activityMinutes: 10, weight: 68.6, bloating: 4 },
+      { mood: 4, sleepHours: 7, waterGlasses: 7, activityType: "Walk", activityMinutes: 20, weight: 68.6, bloating: 3 },
+      { mood: 4, sleepHours: 7.5, waterGlasses: 7, activityType: "Walk", activityMinutes: 25, weight: 68.5, bloating: 3 },
+      { mood: 5, sleepHours: 8, waterGlasses: 8, activityType: "Yoga", activityMinutes: 30, weight: 68.4, bloating: 3 },
+      { mood: 4, sleepHours: 7, waterGlasses: 5, activityType: "Walk", activityMinutes: 20, weight: 68.4, bloating: 3 },
+      null,
+      null,
+      null,
+    ],
     todayPlan: {
       date: "Today",
       meals: [
@@ -195,9 +226,34 @@ export const clients: Client[] = [
     status: "needs-attention",
     lastLog: "3 days ago",
     planCycle: { cycleNumber: 3, startDate: "8 days ago", currentDay: 8, totalDays: 15 },
+    programDurationMonths: 6,
+    checkinHistory: [
+      { mood: 2, sleepHours: 6, bloating: 8, hairFall: 4, weight: 74.0 },
+      { mood: 3, sleepHours: 6.5, bloating: 7, hairFall: 4, weight: 73.9 },
+      { mood: 3, sleepHours: 7, bloating: 7, hairFall: 3, weight: 73.8 },
+      { mood: 2, sleepHours: 5.5, bloating: 8, hairFall: 5, weight: 73.9 },
+      { mood: 3, sleepHours: 6, bloating: 6, hairFall: 4, weight: 73.7 },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ],
     periodLogs: [
       { startDate: "22 days ago", endDate: "17 days ago", cycleLength: 5 },
-      { startDate: "3 days ago" },
+      {
+        startDate: "3 days ago",
+        dailyFlow: [
+          { date: "3 days ago", intensity: "heavy" },
+          { date: "2 days ago", intensity: "heavy" },
+          { date: "1 day ago", intensity: "medium" },
+        ],
+      },
     ],
     todayPlan: {
       date: "Today",
@@ -276,6 +332,12 @@ export const clients: Client[] = [
     lastLog: "Today",
     goalWeight: 72,
     planCycle: { cycleNumber: 1, startDate: "2 days ago", currentDay: 2, totalDays: 15 },
+    programDurationMonths: 1,
+    checkinHistory: [
+      { weight: 82.0, sleepHours: 7, mood: 3, waterGlasses: 4, activityType: "None", activityMinutes: 0 },
+      { weight: 81.7, sleepHours: 6.5, mood: 4, waterGlasses: 5, activityType: "Walk", activityMinutes: 15 },
+      null, null, null, null, null, null, null, null, null, null, null, null, null,
+    ],
     todayPlan: {
       date: "Today",
       meals: [
@@ -340,6 +402,17 @@ export const clients: Client[] = [
     status: "on-track",
     lastLog: "Today",
     planCycle: { cycleNumber: 1, startDate: "7 days ago", currentDay: 7, totalDays: 15 },
+    programDurationMonths: 3,
+    checkinHistory: [
+      { sleepHours: 7, mood: 4, skinCondition: 6, waterGlasses: 5, activityType: "Walk", activityMinutes: 10 },
+      { sleepHours: 7.5, mood: 4, skinCondition: 6, waterGlasses: 6, activityType: "Walk", activityMinutes: 15 },
+      { sleepHours: 6.5, mood: 3, skinCondition: 5, waterGlasses: 6, activityType: "None", activityMinutes: 0 },
+      { sleepHours: 7, mood: 4, skinCondition: 5, waterGlasses: 7, activityType: "Walk", activityMinutes: 20 },
+      { sleepHours: 8, mood: 5, skinCondition: 4, waterGlasses: 8, activityType: "Yoga", activityMinutes: 15 },
+      { sleepHours: 7, mood: 4, skinCondition: 4, waterGlasses: 7, activityType: "Walk", activityMinutes: 10 },
+      { sleepHours: 7.5, mood: 4, skinCondition: 3, waterGlasses: 4, activityType: "Walk", activityMinutes: 5 },
+      null, null, null, null, null, null, null, null,
+    ],
     todayPlan: {
       date: "Today",
       meals: [

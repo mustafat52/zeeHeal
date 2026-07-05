@@ -477,27 +477,28 @@ lib/store.ts                  (logPeriodStart, logPeriodEnd actions)
   - Plan history per client
 
 
-
-  ## Session 3 — July 4, 2026 · Condition-specific color identity for the 4 home screens
+## Session 3 — July 4, 2026 · Condition-specific color identity for the 4 home screens
 
 ### Summary of what was done this session
-All 4 condition home screens shared one identity (sage header band, same accent everywhere) despite showing completely different content. Each screen now has its own accent hue applied to its header band and its single hero/most-distinctive feature, while the shared card system, borders, and body text stay exactly as they were. Semantic colors (skin severity scale, streak flame, trend arrows) were deliberately left untouched since they carry meaning independent of which condition owns the screen.
+All 4 condition home screens shared one identity (sage header band, same accent everywhere) despite showing completely different content. Each screen now has its own accent hue applied to its header band and its single hero/most-distinctive feature, while the shared card system, borders, and body text stay exactly as they were. Semantic colors (skin severity scale, streak flame, trend arrows, clay "needs attention" states) were deliberately left untouched since they carry meaning independent of which condition owns the screen. Part 2 extends the accent down into the 3 shared components so the identity carries the whole way through each screen, not just the header.
 
 ---
 
 ### `components/client/homes/WeightLossHome.tsx` — Updated
 
 **Before:**
-- Header band `bg-sage-100` / `text-sage-800` (same as every other screen)
+- Header band `bg-sage-100` / `text-sage-800`
 - Goal progress bar fill `bg-sage-600`
-- `Target` icon uncolored (inherited default text color)
+- `Target` icon uncolored
+- `PlanCycleBar` and `CheckinCard` rendered with no accent
 
 **After:**
 - Header band recolored to `bg-amber-50` / `text-amber-800`
 - Goal progress bar fill recolored to `bg-amber-500`
 - `Target` icon recolored to `text-amber-600`
+- `<PlanCycleBar accent="amber" />` and `<CheckinCard accent="amber" />`
 
-**Why:** Amber reads as momentum/achievement — distinct from the generic sage used everywhere else, applied only to the screen's header and its goal-progress hero element.
+**Why:** Amber reads as momentum/achievement — distinct from the generic sage used everywhere else.
 
 ---
 
@@ -505,15 +506,17 @@ All 4 condition home screens shared one identity (sage header band, same accent 
 
 **Before:**
 - Header band `bg-sage-100` / `text-sage-800`
-- `PeriodCalendar` rendered with no distinguishing frame
+- `PeriodCalendar` themed entirely in clay/sage (period days `bg-clay-400`, today `bg-sage-100`, log buttons `clay-100`/`sage-100`, confirm CTA `bg-clay-400`)
 - "Today's symptoms" `Activity` icon uncolored
+- `PlanCycleBar` and `CheckinCard` rendered with no accent
 
 **After:**
 - Header band recolored to `bg-rose-50` / `text-rose-800`
-- `PeriodCalendar` wrapped in `<div className="rounded-2xl ring-1 ring-rose-200/70">` to visually anchor it as the screen's hero element
+- `PeriodCalendar` recolored internally to rose throughout: log buttons (`bg-rose-100`/`bg-rose-50`), status banner dot and background, period-day fills (`bg-rose-400`), today-marker (`bg-rose-100`), confirm CTA (`bg-rose-500`), and card border (`border-rose-100/70`)
 - `Activity` icon recolored to `text-rose-600`
+- `<PlanCycleBar accent="rose" />` and `<CheckinCard accent="rose" />`
 
-**Why:** Rose was chosen over clay deliberately — clay is already doing double duty as the nutritionist-side brand color and the "needs attention" alert color elsewhere in the app, so reusing it as a client-facing identity color would blur that meaning. Rose keeps the period-tracking warmth without the collision.
+**Why:** Rose was chosen over clay deliberately — clay is already doing double duty as the nutritionist-side brand color and the app-wide "needs attention" alert color, so reusing it as a client-facing identity color would blur that meaning. Rose keeps the period-tracking warmth without the collision. `PeriodCalendar` is PCOS-exclusive so the color is hardcoded rather than passed as a prop — no other screen consumes this component.
 
 ---
 
@@ -521,17 +524,18 @@ All 4 condition home screens shared one identity (sage header band, same accent 
 
 **Before:**
 - Header band `bg-sage-100` / `text-sage-800`
-- Mood/energy chart bars: `bg-clay-200` (mood), `bg-sage-200` (energy) — same palette as every other screen's misc elements
-- Legend swatches matched the old bar colors
+- Mood/energy chart bars `bg-clay-200` (mood) / `bg-sage-200` (energy), legend swatches matching
 - Water droplet icon `text-sage-600`
+- `PlanCycleBar` and `CheckinCard` rendered with no accent
 
 **After:**
 - Header band recolored to `bg-violet-50` / `text-violet-800`
-- Mood/energy chart bars recolored to `bg-violet-200` (mood), `bg-violet-500` (energy) — single-hue family instead of borrowed clay/sage
+- Mood/energy chart bars recolored to `bg-violet-200` (mood) / `bg-violet-500` (energy) — single-hue family instead of borrowed clay/sage
 - Legend swatches updated to match
 - Water droplet icon recolored to `text-violet-600`
+- `<PlanCycleBar accent="violet" />` and `<CheckinCard accent="violet" />`
 
-**Why:** Violet gives this screen a calm/balance register, distinct from the achievement-oriented weight-loss screen. The mood/energy chart is this screen's hero, so it carries the strongest dose of the new accent.
+**Why:** Violet gives this screen a calm/balance register, distinct from the achievement-oriented weight-loss screen.
 
 ---
 
@@ -541,22 +545,66 @@ All 4 condition home screens shared one identity (sage header band, same accent 
 - Header band `bg-sage-100` / `text-sage-800`
 - Insight tip box `bg-sage-50` with `Sparkles` icon `text-sage-600`
 - Photo-log CTA border `border-sage-200`, text `text-sage-700`
+- `PlanCycleBar` and `CheckinCard` rendered with no accent
 
 **After:**
 - Header band recolored to `bg-teal-50` / `text-teal-800`
 - Insight tip box recolored to `bg-teal-50` with `Sparkles` icon `text-teal-600`
 - Photo-log CTA recolored to `border-teal-200`, text `text-teal-700`
+- `<PlanCycleBar accent="teal" />` and `<CheckinCard accent="teal" />`
 
-**Why:** Teal reads cooler/cleaner than sage, separating skincare from the generic green used everywhere else. The 5-point skin severity scale (`sage → clay → red`) was intentionally left unchanged since it's a meaning-carrying scale, not a brand color — recoloring it would hurt legibility instead of adding identity.
+**Why:** Teal reads cooler/cleaner than sage, separating skincare from the generic green used everywhere else. The 5-point skin severity scale (`sage → clay → red`) was intentionally left unchanged since it's a meaning-carrying scale, not a brand color.
+
+---
+
+### `components/client/PlanCycleBar.tsx` — Updated (Part 2)
+
+**Before:**
+- No `accent` prop. Days-left pill and progress fill hardcoded to `bg-sage-100`/`text-sage-700`/`bg-sage-600`. Near-end "review soon" state hardcoded to clay.
+
+**After:**
+- Added optional `accent?: "amber" | "rose" | "violet" | "teal"` prop with a `ACCENT_STYLES` lookup map (`pillBg`, `pillText`, `barFill` per accent)
+- When `accent` is omitted, falls back to the original sage styling (backward compatible)
+- Near-end alert state (`daysLeft <= 3`) stays clay regardless of accent — this is a universal warning cue, not identity
+
+**Why:** Used by all 4 home screens, so the color needed to be parameterized rather than hardcoded to one condition.
+
+---
+
+### `components/client/CheckinCard.tsx` — Updated (Part 2)
+
+**Before:**
+- No `accent` prop. Done-state checkmark circle hardcoded to `bg-sage-100`/`text-sage-600`.
+
+**After:**
+- Added optional `accent?: "amber" | "rose" | "violet" | "teal"` prop with an `ACCENT_STYLES` lookup map (`doneBg`, `doneIcon` per accent)
+- Applies only to the done-state checkmark circle
+- Not-done CTA state stays clay regardless of accent — same "needs action" universal cue as the digest card elsewhere in the app
+
+**Why:** Same rationale as `PlanCycleBar` — shared across all 4 screens, needed to stay reusable.
+
+---
+
+### `components/client/PeriodCalendar.tsx` — Updated (Part 2)
+
+**Before:**
+- Fully clay/sage themed (see PCOSHome entry above)
+
+**After:**
+- Fully recolored to rose (see PCOSHome entry above) — themed internally rather than via prop since it has exactly one consumer
+
+**Why:** Consolidates the PCOS identity into the component itself instead of relying on an external wrapper div, which was removed from `PCOSHome.tsx` as part of this change.
 
 ---
 
 ### What was NOT touched (scope note)
-`PlanCycleBar.tsx`, `CheckinCard.tsx`, `TodayMeals.tsx`, and `PeriodCalendar.tsx` were not part of this session (not provided for editing) — they still render in default sage/clay. If the per-condition accent should carry into those shared components too, they need to accept an `accent` prop next session rather than hardcoding sage.
+`TodayMeals.tsx`, `LogMealModal.tsx`, and `DailyCheckinModal.tsx` remain in the original neutral sage/moss palette. Meal logging and check-in data entry are transactional flows shared identically across all 4 conditions — kept deliberately unbranded so the *action* of logging feels consistent everywhere, even though the surrounding screen doesn't.
 
 ---
 
 ### Git details
+
+**Commit 1:**
 
 Commit:   e6059f6
 Message:  "trying other screens ui"
@@ -574,8 +622,29 @@ components/client/homes/PCOSHome.tsx         (rose accent)
 components/client/homes/HormonalHome.tsx     (violet accent)
 components/client/homes/SkincareHome.tsx     (teal accent)
 
+**Commit 2:**
+
+Commit:   c6b6803
+Message:  "trying other screens ui part 2"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 8
+Insertions:    +153
+Deletions:     -29
+Modified files:
+components/client/PlanCycleBar.tsx           (added accent prop)
+components/client/CheckinCard.tsx            (added accent prop)
+components/client/PeriodCalendar.tsx         (recolored to rose internally)
+components/client/homes/WeightLossHome.tsx   (wired accent="amber")
+components/client/homes/PCOSHome.tsx         (wired accent="rose", removed redundant ring wrapper)
+components/client/homes/HormonalHome.tsx     (wired accent="violet")
+components/client/homes/SkincareHome.tsx     (wired accent="teal")
+
 ---
 
 ### What's next
-- Decide whether `PlanCycleBar`, `CheckinCard`, and `PeriodCalendar` should accept the condition accent as a prop so the identity carries all the way down each screen, not just the header + hero element
-- Phase 2 (15-day cycle management on Zainab's nutritionist dashboard) is still the next major milestone per README Build Order
+- The 4 condition home screens are now fully finished — color identity carries from header through hero feature down to the check-in state.
+- Phase 2 (15-day cycle management on Zainab's nutritionist dashboard) is the next major milestone per README Build Order:
+  - Show which clients are at/near Day 15
+  - Plan renewal flow (push new plan at end of cycle)
+  - Plan history per client
