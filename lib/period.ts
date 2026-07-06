@@ -49,3 +49,37 @@ export function buildFlowDataForCycle(
   }
   return result;
 }
+
+/**
+ * Indexes a single period's flow by DAY OF THAT PERIOD (Day 1, Day 2, ...),
+ * not by day-of-plan-cycle. This is the correct framing for showing the
+ * client their own period, as opposed to buildFlowDataForCycle above which
+ * answers "how did this 15-day nutrition cycle look" for Zainab's reports.
+ * An ongoing period (no endDate) is measured up to today.
+ */
+export function buildFlowForPeriod(log: PeriodLog): (FlowIntensity | null)[] {
+  const start = parseRelativeDate(log.startDate);
+  if (!start) return [];
+  const end = log.endDate ? parseRelativeDate(log.endDate) : new Date();
+  if (!end) return [];
+
+  const a = new Date(start);
+  a.setHours(0, 0, 0, 0);
+  const b = new Date(end);
+  b.setHours(0, 0, 0, 0);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const spanDays = Math.max(1, Math.round((b.getTime() - a.getTime()) / msPerDay) + 1);
+
+  const result: (FlowIntensity | null)[] = Array.from({ length: spanDays }, () => null);
+  if (!log.dailyFlow) return result;
+
+  for (const entry of log.dailyFlow) {
+    const d = parseRelativeDate(entry.date);
+    if (!d) continue;
+    const dz = new Date(d);
+    dz.setHours(0, 0, 0, 0);
+    const idx = Math.round((dz.getTime() - a.getTime()) / msPerDay);
+    if (idx >= 0 && idx < spanDays) result[idx] = entry.intensity;
+  }
+  return result;
+}

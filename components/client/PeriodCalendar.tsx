@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PeriodLog } from "@/lib/mock-data/clients";
+import { PeriodLog, FlowIntensity } from "@/lib/mock-data/clients";
 import { useAppStore } from "@/lib/store";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, Check } from "lucide-react";
@@ -12,6 +12,12 @@ const MONTHS = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
 ];
+
+const FLOW_BG: Record<FlowIntensity, string> = {
+  light: "bg-rose-200",
+  medium: "bg-rose-400",
+  heavy: "bg-rose-600",
+};
 
 function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -32,6 +38,22 @@ function parseRelativeDate(str: string): Date | null {
   return null;
 }
 
+/** Converts an actual Date back into the app's relative-string format. */
+function labelForDate(date: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "1 day ago";
+  return `${diffDays} days ago`;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.toDateString() === b.toDateString();
+}
+
 function isPeriodDay(day: number, month: number, year: number, logs: PeriodLog[]): boolean {
   const target = new Date(year, month, day);
   for (const log of logs) {
@@ -45,6 +67,18 @@ function isPeriodDay(day: number, month: number, year: number, logs: PeriodLog[]
     }
   }
   return false;
+}
+
+function flowForDay(day: number, month: number, year: number, logs: PeriodLog[]): FlowIntensity | null {
+  const target = new Date(year, month, day);
+  for (const log of logs) {
+    if (!log.dailyFlow) continue;
+    for (const entry of log.dailyFlow) {
+      const d = parseRelativeDate(entry.date);
+      if (d && isSameDay(d, target)) return entry.intensity;
+    }
+  }
+  return null;
 }
 
 export function PeriodCalendar({
@@ -61,7 +95,14 @@ export function PeriodCalendar({
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [showModal, setShowModal] = useState(false);
+
+  // Unified sheet state for both the fixed "today" pill button AND tapping
+  // any individual calendar day.
+  const [sheet, setSheet] = useState<
+    | null
+    | { kind: "startEnd"; label: string }
+    | { kind: "flow"; label: string }
+  >(null);
 
   const totalDays = daysInMonth(viewYear, viewMonth);
   const firstDay = firstDayOfMonth(viewYear, viewMonth);
@@ -70,6 +111,7 @@ export function PeriodCalendar({
 
   const hasActiveLog = periodLogs.length > 0 && !periodLogs[periodLogs.length - 1].endDate;
   const lastLog = periodLogs[periodLogs.length - 1];
+  const activeStart = hasActiveLog ? parseRelativeDate(lastLog.startDate) : null;
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -80,12 +122,37 @@ export function PeriodCalendar({
     else setViewMonth(m => m + 1);
   }
 
+  function handleDayTap(day: number) {
+    const clicked = new Date(viewYear, viewMonth, day);
+    clicked.setHours(0, 0, 0, 0);
+    const todayZero = new Date();
+    todayZero.setHours(0, 0, 0, 0);
+
+    if (clicked > todayZero) return; // no logging future dates
+
+    const label = labelForDate(clicked);
+
+    if (hasActiveLog && activeStart && clicked >= activeStart) {
+      // Within the ongoing period — log/edit that day's flow.
+      setSheet({ kind: "flow", label });
+    } else if (!hasActiveLog) {
+      // No active period — offer to start one on the tapped day.
+      setSheet({ kind: "startEnd", label });
+    }
+    // Tapping a day inside an already-closed past period is a no-op for now.
+  }
+
+  const todaysFlowForSheet =
+    sheet?.kind === "flow"
+      ? lastLog?.dailyFlow?.find((f) => f.date === sheet.label)?.intensity
+      : undefined;
+
   return (
     <div className="bg-white rounded-xl border border-rose-100/70 shadow-card p-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-medium text-moss-900">Cycle tracker</p>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setSheet({ kind: "startEnd", label: "Today" })}
           className={clsx(
             "tap-scale text-xs font-medium px-3 py-1.5 rounded-full",
             hasActiveLog
@@ -135,6 +202,8 @@ export function PeriodCalendar({
         </div>
       )}
 
+      <p className="text-[10px] text-moss-400 mb-2">Tap any past day to log or edit it directly</p>
+
       <div className="flex items-center justify-between mb-2">
         <button onClick={prevMonth} className="tap-scale p-1" aria-label="Previous month">
           <ChevronLeft size={16} className="text-moss-400" />
@@ -155,33 +224,40 @@ export function PeriodCalendar({
         ))}
         {blanks.map((b) => <div key={`b${b}`} />)}
         {days.map((day) => {
+          const cellDate = new Date(viewYear, viewMonth, day);
+          const isFuture = cellDate.setHours(0,0,0,0) > new Date().setHours(0,0,0,0);
           const isToday =
             day === today.getDate() &&
             viewMonth === today.getMonth() &&
             viewYear === today.getFullYear();
           const isPeriod = isPeriodDay(day, viewMonth, viewYear, periodLogs);
+          const flow = isPeriod ? flowForDay(day, viewMonth, viewYear, periodLogs) : null;
           return (
-            <div
+            <button
               key={day}
+              onClick={() => handleDayTap(day)}
+              disabled={isFuture}
               className={clsx(
-                "aspect-square flex items-center justify-center rounded-full text-[11px] font-medium mx-auto w-7 h-7",
-                isPeriod && "bg-rose-400 text-white",
+                "aspect-square flex items-center justify-center rounded-full text-[11px] font-medium mx-auto w-7 h-7 tap-scale",
+                isFuture && "opacity-30 cursor-not-allowed",
+                isPeriod && (flow ? FLOW_BG[flow] : "bg-rose-400") && "text-white",
+                isPeriod && (flow ? FLOW_BG[flow] : "bg-rose-400"),
                 isToday && !isPeriod && "bg-rose-100 text-rose-700 font-semibold",
                 !isPeriod && !isToday && "text-moss-600"
               )}
             >
               {day}
-            </div>
+            </button>
           );
         })}
       </div>
 
       <AnimatePresence>
-        {showModal && (
+        {sheet && (
           <div
             className="fixed inset-0 z-50 flex items-end justify-center bg-moss-900/40"
             style={{ minHeight: "100vh" }}
-            onClick={() => setShowModal(false)}
+            onClick={() => setSheet(null)}
           >
             <motion.div
               initial={{ y: "100%" }}
@@ -191,30 +267,68 @@ export function PeriodCalendar({
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-md bg-ivory rounded-t-[28px] px-5 pt-5 pb-10"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display text-lg text-moss-900">
-                  {hasActiveLog ? "Log period end" : "Log period start"}
-                </h3>
-                <button onClick={() => setShowModal(false)} className="tap-scale w-8 h-8 rounded-full bg-white flex items-center justify-center" aria-label="Close">
-                  <X size={15} className="text-moss-600" />
-                </button>
-              </div>
-              <p className="text-sm text-moss-400 mb-5">
-                {hasActiveLog
-                  ? "Mark today as the last day of your period. Zainab will see this automatically."
-                  : "Mark today as the start of your period. Zainab will be notified to check your plan."}
-              </p>
-              <button
-                onClick={() => {
-                  if (hasActiveLog) logPeriodEnd(clientId);
-                  else logPeriodStart(clientId);
-                  setShowModal(false);
-                }}
-                className="tap-scale w-full flex items-center justify-center gap-2 bg-rose-500 text-white rounded-xl py-3.5 text-sm font-medium"
-              >
-                <Check size={16} />
-                {hasActiveLog ? "Confirm period end" : "Confirm period start"}
-              </button>
+              {sheet.kind === "startEnd" ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display text-lg text-moss-900">
+                      {hasActiveLog ? "Log period end" : "Log period start"}
+                    </h3>
+                    <button onClick={() => setSheet(null)} className="tap-scale w-8 h-8 rounded-full bg-white flex items-center justify-center" aria-label="Close">
+                      <X size={15} className="text-moss-600" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-moss-400 mb-5">
+                    {hasActiveLog
+                      ? `Mark ${sheet.label === "Today" ? "today" : sheet.label} as the last day of your period. Zainab will see this automatically.`
+                      : `Mark ${sheet.label === "Today" ? "today" : sheet.label} as the start of your period. Zainab will be notified to check your plan.`}
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (hasActiveLog) logPeriodEnd(clientId, sheet.label);
+                      else logPeriodStart(clientId, sheet.label);
+                      setSheet(null);
+                    }}
+                    className="tap-scale w-full flex items-center justify-center gap-2 bg-rose-500 text-white rounded-xl py-3.5 text-sm font-medium"
+                  >
+                    <Check size={16} />
+                    {hasActiveLog ? "Confirm period end" : "Confirm period start"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display text-lg text-moss-900">
+                      Log flow · {sheet.label === "Today" ? "Today" : sheet.label}
+                    </h3>
+                    <button onClick={() => setSheet(null)} className="tap-scale w-8 h-8 rounded-full bg-white flex items-center justify-center" aria-label="Close">
+                      <X size={15} className="text-moss-600" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2 mb-2">
+                    {(["light", "medium", "heavy"] as const).map((level) => {
+                      const selected = todaysFlowForSheet === level;
+                      return (
+                        <button
+                          key={level}
+                          onClick={() => {
+                            logPeriodFlow(clientId, level, sheet.label);
+                            setSheet(null);
+                          }}
+                          className={clsx(
+                            "tap-scale flex-1 py-3 rounded-xl text-sm font-medium capitalize border",
+                            selected && level === "light" && "bg-rose-200 border-rose-200 text-rose-800",
+                            selected && level === "medium" && "bg-rose-400 border-rose-400 text-white",
+                            selected && level === "heavy" && "bg-rose-600 border-rose-600 text-white",
+                            !selected && "bg-white border-sage-100 text-moss-600"
+                          )}
+                        >
+                          {level}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
 import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { TrendingDown, TrendingUp, Droplet } from "lucide-react";
+import { PeriodFlowChart } from "@/components/client/PeriodFlowChart";
 
 function useChartWidth() {
   const ref = useRef<HTMLDivElement>(null);
@@ -35,6 +36,12 @@ export default function ClientProgressPage() {
   const weightChange = (last.weight - first.weight).toFixed(1);
   const bloatingImproved = last.bloating < first.bloating;
 
+  const periodLogs = client.condition === "pcos" ? client.periodLogs ?? [] : [];
+  const periodLengths = periodLogs.filter((l) => l.cycleLength !== undefined).map((l) => l.cycleLength as number);
+  const avgPeriodLength = periodLengths.length
+    ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
+    : null;
+
   return (
     <div className="pt-12 px-5">
       <h1 className="font-display text-2xl text-moss-900 mb-1">Your progress</h1>
@@ -52,6 +59,39 @@ export default function ClientProgressPage() {
             {client.monthlyRecap}
           </p>
         </div>
+      )}
+
+      {client.condition === "pcos" && (
+        <Card className="mb-5">
+          <p className="text-sm font-medium text-moss-600 mb-3 flex items-center gap-1.5">
+            <Droplet size={13} className="text-rose-500" /> Your cycle
+          </p>
+          {periodLogs.length === 0 ? (
+            <p className="text-xs text-moss-400">No periods logged yet.</p>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2 mb-3">
+                {[...periodLogs].reverse().slice(0, 4).map((log, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-moss-900">
+                      {log.startDate}
+                      {log.endDate ? ` – ${log.endDate}` : " · ongoing"}
+                    </span>
+                    {log.cycleLength !== undefined && (
+                      <span className="text-xs text-moss-400">{log.cycleLength}-day period</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {avgPeriodLength !== null && (
+                <p className="text-xs text-moss-600 pt-2.5 border-t border-sage-100">
+                  Average period length: <span className="font-medium text-moss-900">{avgPeriodLength} days</span>
+                </p>
+              )}
+              <PeriodFlowChart log={periodLogs[periodLogs.length - 1]} />
+            </>
+          )}
+        </Card>
       )}
 
       <div className="grid grid-cols-2 gap-3 mb-5">

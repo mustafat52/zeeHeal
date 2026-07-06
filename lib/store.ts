@@ -17,9 +17,9 @@ interface AppState {
   addWater: (clientId: string) => void;
   logCheckin: (clientId: string, checkin: DailyCheckin) => void;
   setCheckinConfig: (clientId: string, config: CheckinConfig) => void;
-  logPeriodStart: (clientId: string) => void;
-  logPeriodEnd: (clientId: string) => void;
-  logPeriodFlow: (clientId: string, intensity: FlowIntensity) => void;
+  logPeriodStart: (clientId: string, dateLabel?: string) => void;
+  logPeriodEnd: (clientId: string, dateLabel?: string) => void;
+  logPeriodFlow: (clientId: string, intensity: FlowIntensity, dateLabel?: string) => void;
   renewPlanCycle: (clientId: string) => void;
 }
 
@@ -110,29 +110,29 @@ export const useAppStore = create<AppState>((set) => ({
       ),
     })),
 
-  logPeriodStart: (clientId) =>
+  logPeriodStart: (clientId, dateLabel = "Today") =>
     set((state) => ({
       clients: state.clients.map((c) => {
         if (c.id !== clientId) return c;
-        const newLog: PeriodLog = { startDate: "Today" };
+        const newLog: PeriodLog = { startDate: dateLabel };
         return { ...c, periodLogs: [...(c.periodLogs ?? []), newLog] };
       }),
     })),
 
-  logPeriodEnd: (clientId) =>
+  logPeriodEnd: (clientId, dateLabel = "Today") =>
     set((state) => ({
       clients: state.clients.map((c) => {
         if (c.id !== clientId) return c;
         const logs = [...(c.periodLogs ?? [])];
         const last = logs[logs.length - 1];
         if (last && !last.endDate) {
-          logs[logs.length - 1] = { ...last, endDate: "Today" };
+          logs[logs.length - 1] = { ...last, endDate: dateLabel };
         }
         return { ...c, periodLogs: logs };
       }),
     })),
 
-  logPeriodFlow: (clientId, intensity) =>
+  logPeriodFlow: (clientId, intensity, dateLabel = "Today") =>
     set((state) => ({
       clients: state.clients.map((c) => {
         if (c.id !== clientId) return c;
@@ -141,11 +141,11 @@ export const useAppStore = create<AppState>((set) => ({
         if (lastIdx < 0 || logs[lastIdx].endDate) return c; // no active period to log against
         const last = logs[lastIdx];
         const dailyFlow = [...(last.dailyFlow ?? [])];
-        const todayIdx = dailyFlow.findIndex((f) => f.date === "Today");
-        if (todayIdx >= 0) {
-          dailyFlow[todayIdx] = { date: "Today", intensity };
+        const idx = dailyFlow.findIndex((f) => f.date === dateLabel);
+        if (idx >= 0) {
+          dailyFlow[idx] = { date: dateLabel, intensity };
         } else {
-          dailyFlow.push({ date: "Today", intensity });
+          dailyFlow.push({ date: dateLabel, intensity });
         }
         logs[lastIdx] = { ...last, dailyFlow };
         return { ...c, periodLogs: logs };

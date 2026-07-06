@@ -648,3 +648,221 @@ components/client/homes/SkincareHome.tsx     (wired accent="teal")
   - Show which clients are at/near Day 15
   - Plan renewal flow (push new plan at end of cycle)
   - Plan history per client
+
+
+  ## Session 4 — July 5, 2026 · 15-day cycle review: dashboard indicators, Cycle Report, patient profile, and period flow tracking
+
+### Summary of what was done this session
+Phase 2 of the README build order (15-day cycle management) was implemented, then substantially deepened based on Zainab's feedback that plan renewal needs to be an informed decision, not a one-tap reset. What started as a simple "Day X/15" badge on the dashboard grew into a full Cycle Report: a gate Zainab must open before renewing a client's cycle, showing day-by-day consistency across sleep, water, and condition-specific factors (activity, mood, skin condition), a patient enrollment profile (program length, cycles completed), and period flow intensity tracking for PCOS clients. A build error surfaced near the end of the session (a new required field broke client-onboarding creation) and was resolved by making the field optional with a graceful fallback, then properly fixed by adding a program-length selector to onboarding itself.
+
+---
+
+### `lib/store.ts` — Updated
+
+**Before:**
+- No `renewPlanCycle` action
+- `logCheckin` only overwrote `todayCheckin`, no historical record kept
+- No period flow logging
+
+**After:**
+- Added `renewPlanCycle(clientId)` — bumps `cycleNumber`, resets `currentDay` to 1, sets `startDate` to `"Today"`, and resets `checkinHistory` to a fresh 15-null array
+- `logCheckin` now also writes into `checkinHistory[currentDay - 1]` in addition to `todayCheckin`, so the current cycle's day-by-day data is preserved rather than only ever showing "today"
+- Added `logPeriodFlow(clientId, intensity)` — records or updates today's flow intensity on the active period log; no-ops if no period is currently active
+
+**Why:** The dashboard's initial "Renew" pill called `renewPlanCycle` directly on tap, with no visibility into what happened during the cycle. Zainab pointed out her plan changes are based on the client's progress over those 15 days, so renewal needed to move behind a real review step — which meant the store needed to actually retain daily history instead of only tracking "today."
+
+---
+
+### `app/(nutritionist)/dashboard/page.tsx` — Updated (twice)
+
+**Before:**
+- No indication of which clients were near the end of their cycle
+- Two-card stat grid: Active clients, Needs attention
+
+**After (first pass):**
+- Added `cycleReviewDue` count (clients with `totalDays - currentDay <= 3`), shown as a clay banner under the stat grid, only rendered when count > 0
+- Each client row shows `Day X/15`; within 3 days of the end, this became a tappable clay pill that called `renewPlanCycle` directly
+
+**After (revised, once the report requirement was raised):**
+- The per-row badge no longer calls `renewPlanCycle`. It's back to a plain (but still clay-highlighted when near end) indicator reading `Day 12/15 · Review due` — tapping it just opens the client like any other row. Renewal moved entirely to the client detail page.
+
+**Why:** The first version optimized for a satisfying one-tap dashboard action. The revision reflects that renewal is a clinical decision that needs the full report first — the dashboard's job is now just to flag *who* needs review, not to let Zainab renew from a list view.
+
+---
+
+### `app/(nutritionist)/client/[id]/page.tsx` — Updated
+
+**Before:**
+- Two-button row: "Prep for call," "Check-in setup"
+- No cycle-review entry point
+
+**After:**
+- New full-width "Cycle {N} review" trigger card above the existing two-button row — solid clay and reading "review due" when within 3 days of Day 15, plain white/neutral otherwise
+- Opens `CycleReportModal`; its `onRenew` callback is the only place `renewPlanCycle` is called from anywhere in the app
+
+**Why:** Consolidates renewal behind a single, deliberate entry point, modeled visually on the existing "Prep for call" card so it reads as part of the same family of nutritionist tools rather than a bolted-on feature.
+
+---
+
+### `components/nutritionist/CycleReportModal.tsx` — New file, then substantially extended
+
+**v1:** Modeled on `PrepSheetModal`'s pattern (adherence-style stat cards, weight/bloating trend with arrows, last-3-notes list), scoped to the whole cycle instead of "today." Included a condition-specific single card: goal-weight delta (weight-loss), period-log count (PCOS), and "today only, no trend" caveats for skincare and hormonal mood/skin, since no daily history existed yet.
+
+**v2 (after Zainab's feedback):** Rebuilt around real daily data once `checkinHistory` existed:
+- Added `PatientProfileCard` at the top (program length, cycles completed, overall progress)
+- Replaced the "Session notes" stat with **"Logged this cycle: X/Y days"** — a real consistency metric computed from `checkinHistory`
+- Added three `DailyBarStrip` charts per report: **Sleep** and **Water** (universal), plus one condition-specific chart — **Activity** (weight-loss), **Mood** (PCOS, hormonal), **Skin condition** (skincare)
+- This retroactively resolved the "today only" caveats from v1 — mood and skin condition now have real 15-day trends, so those disclaimer cards were removed
+- Added `PeriodFlowStrip` for PCOS clients, replacing the "flow intensity isn't tracked yet" note with an actual color-coded daily flow chart
+
+**Why:** v1 was honest about a real data gap (no daily history existed). Once that gap was closed via `checkinHistory`, the caveats became unnecessary and were replaced with the real thing rather than left in as stale disclaimers.
+
+---
+
+### `lib/mock-data/clients.ts` — Updated (three passes)
+
+**Before:**
+- No daily history of any kind — only `todayCheckin` (single snapshot) and weekly `progress[]` (4 points)
+- `PeriodLog` had no flow data — only `startDate`/`endDate`/`cycleLength`
+- No concept of overall program length, only per-cycle data
+
+**After (main pass):**
+- Added `checkinHistory?: (DailyCheckin | null)[]` to `Client` — a 15-slot array, index 0 = Day 1 of the *current* cycle, `null` meaning "not logged that day." Resets on `renewPlanCycle`.
+- Added `programDurationMonths: number` to `Client` (initially required)
+- Added `FlowIntensity = "light" | "medium" | "heavy"` type and `dailyFlow?: { date: string; intensity: FlowIntensity }[]` on `PeriodLog`
+- Seeded realistic `checkinHistory` for all 4 clients, deliberately including gaps for Ananya (days 6–8 missing) to match her existing "needs attention, logging dropped off" narrative rather than showing an artificially perfect record
+- Seeded Ananya's active period log with 3 days of flow data ("heavy, heavy, medium"), timed to land on the same days her check-ins went quiet — surfacing a real clinical explanation (period onset) for the consistency drop, rather than leaving it looking like unexplained disengagement
+- Added `programDurationMonths` values to all 4 seeded clients (Priya: 3, Ananya: 6, Fatima: 1, Riya: 3)
+
+**After (build-fix pass):**
+- Changed `programDurationMonths: number` to `programDurationMonths?: number` — the Vercel build failed because `NewClientFormModal` created new `Client` objects without this field, and the type checker correctly caught the mismatch
+
+**Why:** This is the actual data-model foundation the whole session's reporting features are built on. The deliberate gaps and the period/check-in-drop-off correlation for Ananya aren't just filler — they make the report's core value visible in the demo: Zainab can now see not just *that* a client went quiet, but plausibly *why*. The field going optional was a necessary correction once a real onboarding flow (which doesn't know this value yet by default) exposed the assumption that every client would always have it.
+
+---
+
+### `components/nutritionist/PatientProfileCard.tsx` — New file, then hardened
+
+**v1:** Program length, start date, cycles completed (`cycleNumber - 1`), and a progress bar computed as `elapsedDays / (programDurationMonths * 30)`.
+
+**v2 (build-fix):** Guarded against `programDurationMonths` being `undefined`. The card now branches: if set, shows the full progress bar and estimate; if not, shows a plain "program length not set for this client yet" line instead of computing a misleading percentage from a missing number.
+
+**Why:** New clients created through onboarding wouldn't have this field until the onboarding form was updated to collect it — the card needed to degrade gracefully rather than break, and rather than silently invent a default duration that could mislead Zainab.
+
+---
+
+### `components/nutritionist/DailyBarStrip.tsx` — New file
+
+Reusable 15-cell bar chart. Logged days render as a colored bar scaled to value; missed days render as a thin gray dash rather than a zero-height bar, so gaps are visually distinct from "logged a low number." Built with hand-rolled divs, not Recharts — deliberately, since Recharts + `ResizeObserver` inside a scrollable bottom sheet is the same class of GPU-tearing issue already fixed elsewhere in this app (see Session 1's chart fix).
+
+---
+
+### `components/nutritionist/PeriodFlowStrip.tsx` — New file
+
+Same 15-cell grid concept as `DailyBarStrip`, but specialized for categorical flow data: both bar height *and* color encode intensity (light/medium/heavy → increasingly saturated rose), and non-period days render as a faint neutral mark rather than the "missed" gray dash, since most days in a cycle aren't period days at all — that's a different meaning from "should have logged and didn't."
+
+---
+
+### `lib/period.ts` — New file
+
+Self-contained util for mapping relative-date period logs onto a cycle-day-indexed array (`buildFlowDataForCycle`). Includes its own `parseRelativeDate` rather than importing the one already living inside `PeriodCalendar.tsx`, to avoid refactoring working date-parsing logic under time pressure — a deliberate small duplication traded for lower risk.
+
+---
+
+### `components/client/PeriodCalendar.tsx` — Updated
+
+**Before:** Log period start/end only. No way to record flow.
+
+**After:** When a period is active, a "Today's flow" row appears with Light/Medium/Heavy pills, calling the new `logPeriodFlow` action. Selected intensity is visually distinct per level (light = soft rose fill, medium/heavy = increasingly solid).
+
+**Why:** Zainab specifically asked for blood flow to be tracked as a factor, not just period start/end dates — flow intensity during the period is clinically more useful than a binary "period happening or not."
+
+---
+
+### `components/nutritionist/NewClientFormModal.tsx` — Updated
+
+**Before:** No program-length field — the created `Client` object didn't set `programDurationMonths` at all, which is what broke the Vercel type check once that field existed on the interface.
+
+**After:** New "Program length" section between the plan-name input and the check-in toggles — four preset pills (1/3/6/12 months) plus a custom number input for non-standard durations. Left optional (not part of the `canSave` gate) — a client onboarded without it shows "Not set" on their `PatientProfileCard` rather than a fabricated number.
+
+**Why:** This is the actual long-term fix for the build error — new clients should have Zainab deliberately choose a program length at signup, not silently default to a placeholder. Combined with the previous two files' fallback handling, the app now degrades gracefully for legacy/unset clients while giving a proper path forward for new ones.
+
+---
+
+### What's next
+- Phase 2 (15-day cycle management) is now functionally complete: dashboard indicators, gated renewal, real day-by-day consistency reporting, patient enrollment profile, and period flow tracking
+- Phase 3 per README (meal plan assignment to a specific client, plan history viewer) is the next major milestone — note that "plan history" now has a natural foundation to build on, since `checkinHistory` currently resets to null on renewal and would need to be archived per-cycle rather than discarded if a history viewer is built
+
+
+## Session 5 — July 5, 2026 · Plan history: cycle archiving and a past-cycles viewer
+
+### Summary of what was done this session
+Closed the gap flagged at the end of Session 4: renewing a cycle previously discarded all of that cycle's data with nothing kept anywhere in the app. `renewPlanCycle` now archives the completed cycle before resetting, and a new Plan History viewer lets Zainab look back at any past cycle's day-by-day data — reusing the same chart components built for the live Cycle Report rather than duplicating that logic.
+
+---
+
+### `lib/mock-data/clients.ts` — Updated
+
+**Before:**
+- No archival of any kind — `renewPlanCycle` reset `checkinHistory` to nulls with no record kept of what it had contained
+
+**After:**
+- Added `CycleSnapshot` interface: `{ cycleNumber, startDate, checkinHistory, streakAtEnd }`
+- Added `cycleHistory?: CycleSnapshot[]` to `Client` — oldest first
+- Deliberately does NOT duplicate `periodLogs` into each snapshot — since `periodLogs` are never deleted from the client, a past cycle's period flow can always be reconstructed later from `periodLogs` + that snapshot's `startDate`, so storing only the `startDate` avoids redundant/driftable data
+- Seeded Priya's completed Cycle 1 as an example (14/15 days logged, one gap, weight trending down 70.5 → 69.4) so the history viewer has real content immediately
+
+**Why:** Keeps the archive minimal — only what can't be derived elsewhere gets stored, everything else is recomputed on demand from data that already exists.
+
+---
+
+### `lib/store.ts` — Updated
+
+**Before:**
+- `renewPlanCycle` reset `checkinHistory` to a fresh null array with no archival step
+
+**After:**
+- `renewPlanCycle` now builds a `CycleSnapshot` from the client's current `planCycle` + `checkinHistory` + `streak`, appends it to `cycleHistory`, *then* resets for the new cycle
+
+**Why:** This is the actual fix — the just-finished cycle's data now survives the renewal instead of being silently discarded.
+
+---
+
+### `components/nutritionist/PlanHistoryModal.tsx` — New file
+
+Accordion-style list of archived cycles, most recent first. Each collapsed row shows cycle number, start date, days-logged count, and streak-at-end; expanding a row reveals the same `DailyBarStrip`/`PeriodFlowStrip` charts used in the live `CycleReportModal`, fed from that cycle's frozen `checkinHistory` (and, for PCOS clients, `periodLogs` re-filtered against that cycle's `startDate` via the existing `buildFlowDataForCycle` util).
+
+**Why:** Reusing the exact chart components from the live report means a past cycle's data looks and reads identically to a live one — no separate "history view" visual language to maintain.
+
+---
+
+### `app/(nutritionist)/client/[id]/page.tsx` — Updated
+
+**Before:** No way to see anything about a client's prior cycles.
+
+**After:** A small "View past cycles (N)" text link appears beneath the Cycle Review card — only rendered when `cycleHistory` actually has entries, so clients on their first cycle (Ananya, Fatima, Riya) don't see a dead link.
+
+---
+
+### Git details
+
+Commit:   46283c0
+Message:  "moved to next phase"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 4
+Insertions:    +177
+Deletions:     -4
+New files created:
+components/nutritionist/PlanHistoryModal.tsx
+Modified files:
+app/(nutritionist)/client/[id]/page.tsx
+lib/mock-data/clients.ts
+lib/store.ts
+
+---
+
+### What's next
+- Phase 2 (15-day cycle management) is now fully complete, including historical archiving — nothing outstanding from the README's Phase 2 list
+- Phase 3 per README (meal plan assignment to a specific client, plan history viewer) — the plan history viewer is now done; meal plan assignment (attaching a template to a client) is the one remaining item
+- New direction under discussion: going condition-by-condition to deepen each of the 4 client-facing screens (weight-loss, PCOS, hormonal, skincare) beyond their current baseline feature set
