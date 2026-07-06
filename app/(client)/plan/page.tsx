@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
-import { Droplet } from "lucide-react";
+import { Droplet, Target } from "lucide-react";
 import clsx from "clsx";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -46,6 +46,60 @@ const weekMeals: Record<string, { label: string; items: string }[]> = {
     { label: "Dinner", items: "Khichdi, ghee" },
   ],
 };
+
+const weightLossWeekMeals: Record<string, { label: string; items: string }[]> = {
+  Mon: [
+    { label: "Breakfast", items: "Vegetable oats, boiled egg" },
+    { label: "Lunch", items: "Multigrain roti, dal, salad" },
+    { label: "Dinner", items: "Grilled chicken, sauteed vegetables" },
+  ],
+  Tue: [
+    { label: "Breakfast", items: "Moong dal chilla, mint chutney" },
+    { label: "Lunch", items: "Brown rice, rajma, salad" },
+    { label: "Dinner", items: "Grilled fish, steamed vegetables" },
+  ],
+  Wed: [
+    { label: "Breakfast", items: "Besan chilla, coriander chutney" },
+    { label: "Lunch", items: "Quinoa salad, grilled tofu" },
+    { label: "Dinner", items: "Vegetable soup, grilled chicken" },
+  ],
+  Thu: [
+    { label: "Breakfast", items: "Sprouts salad, boiled egg" },
+    { label: "Lunch", items: "Multigrain roti, chana, salad" },
+    { label: "Dinner", items: "Tofu stir-fry, brown rice" },
+  ],
+  Fri: [
+    { label: "Breakfast", items: "Vegetable poha, flax seeds" },
+    { label: "Lunch", items: "Brown rice, dal, sauteed greens" },
+    { label: "Dinner", items: "Grilled fish, salad" },
+  ],
+  Sat: [
+    { label: "Breakfast", items: "Oats idli, sambhar" },
+    { label: "Lunch", items: "Rajma, brown rice, salad" },
+    { label: "Dinner", items: "Grilled chicken, multigrain roti" },
+  ],
+  Sun: [
+    { label: "Breakfast", items: "Egg bhurji, multigrain toast" },
+    { label: "Lunch", items: "Dal, sabzi, roti, salad" },
+    { label: "Dinner", items: "Clear soup, grilled fish" },
+  ],
+};
+
+/**
+ * Real numbers only — no calorie/macro estimates. This app has stayed
+ * qualitative everywhere (reasoning text, not numeric targets), and
+ * weight-loss is exactly the condition where introducing calorie-counting
+ * for the first time carries real risk. kg progress is the one number
+ * already used throughout the app, so it's kept as the only figure here.
+ */
+function getWeightLossSummary(client: { progress: { weight: number }[]; goalWeight?: number }) {
+  if (client.goalWeight === undefined || client.progress.length === 0) return null;
+  const start = client.progress[0].weight;
+  const current = client.progress[client.progress.length - 1].weight;
+  const lost = parseFloat((start - current).toFixed(1));
+  const toGo = parseFloat((current - client.goalWeight).toFixed(1));
+  return { lost, toGo };
+}
 
 type PcosPhaseKey = "menstrual" | "follicular" | "ovulatory" | "luteal";
 
@@ -249,8 +303,13 @@ export default function ClientPlanPage() {
     !!client.periodLogs?.length && !client.periodLogs[client.periodLogs.length - 1].endDate;
   const pcosPhase =
     client.condition === "pcos" ? getPcosPhase(hasActivePeriod, client.todayCheckin?.cycleDay) : null;
+  const weightLossSummary = client.condition === "weight-loss" ? getWeightLossSummary(client) : null;
 
-  const activeMeals = pcosPhase ? pcosPhaseMeals[pcosPhase.key] : weekMeals;
+  const activeMeals = pcosPhase
+    ? pcosPhaseMeals[pcosPhase.key]
+    : client.condition === "weight-loss"
+    ? weightLossWeekMeals
+    : weekMeals;
 
   return (
     <div className="pt-12 px-5">
@@ -279,6 +338,24 @@ export default function ClientPlanPage() {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {client.condition === "weight-loss" && weightLossSummary && (
+        <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <Target size={13} className="text-amber-600" />
+            </div>
+            <p className="text-sm font-medium text-amber-800">
+              {weightLossSummary.lost > 0 ? `${weightLossSummary.lost} kg lost so far` : "Just getting started"}
+            </p>
+          </div>
+          <p className="text-xs text-moss-600 leading-relaxed">
+            {weightLossSummary.toGo > 0
+              ? `${weightLossSummary.toGo} kg to your goal — this week's meals stay protein and fibre forward to keep you full while you get there.`
+              : "You've reached your goal weight — these meals are built to help you maintain it."}
+          </p>
         </div>
       )}
 

@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Card } from "@/components/ui/Card";
 import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
-import { TrendingDown, TrendingUp, Droplet } from "lucide-react";
+import { TrendingDown, TrendingUp, Droplet, Target } from "lucide-react";
 import { PeriodFlowChart } from "@/components/client/PeriodFlowChart";
+import { ActivityBarStrip } from "@/components/client/ActivityBarStrip";
 
 function useChartWidth() {
   const ref = useRef<HTMLDivElement>(null);
@@ -41,6 +42,17 @@ export default function ClientProgressPage() {
   const avgPeriodLength = periodLengths.length
     ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
     : null;
+
+  const showGoalProgress = client.condition === "weight-loss" && client.goalWeight !== undefined;
+  const lostSoFar = showGoalProgress ? parseFloat((first.weight - last.weight).toFixed(1)) : 0;
+  const toGo = showGoalProgress ? parseFloat((last.weight - client.goalWeight!).toFixed(1)) : 0;
+  const goalDenominator = showGoalProgress ? first.weight - client.goalWeight! : 0;
+  const goalPct = showGoalProgress
+    ? goalDenominator > 0
+      ? Math.max(0, Math.min(100, Math.round((lostSoFar / goalDenominator) * 100)))
+      : 100
+    : 0;
+  const activityData = (client.checkinHistory ?? []).map((h) => h?.activityMinutes ?? null);
 
   return (
     <div className="pt-12 px-5">
@@ -91,6 +103,34 @@ export default function ClientProgressPage() {
               <PeriodFlowChart log={periodLogs[periodLogs.length - 1]} />
             </>
           )}
+        </Card>
+      )}
+
+      {showGoalProgress && (
+        <Card className="mb-5">
+          <p className="text-sm font-medium text-moss-600 mb-3 flex items-center gap-1.5">
+            <Target size={13} className="text-amber-600" /> Goal progress
+          </p>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-moss-600">
+              {lostSoFar > 0 ? `${lostSoFar} kg lost so far` : "Just getting started"}
+            </span>
+            <span className="text-xs text-moss-400">{goalPct}%</span>
+          </div>
+          <div className="h-2 bg-moss-900/8 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-amber-500 rounded-full transition-all duration-700"
+              style={{ width: `${goalPct}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-1 text-[10px] text-moss-400">
+            <span>{first.weight} kg</span>
+            <span>{client.goalWeight} kg goal</span>
+          </div>
+          {toGo > 0 && (
+            <p className="text-xs text-moss-600 mt-2">{toGo} kg to go</p>
+          )}
+          <ActivityBarStrip data={activityData} totalDays={client.planCycle.totalDays} />
         </Card>
       )}
 

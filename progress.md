@@ -866,3 +866,114 @@ lib/store.ts
 - Phase 2 (15-day cycle management) is now fully complete, including historical archiving — nothing outstanding from the README's Phase 2 list
 - Phase 3 per README (meal plan assignment to a specific client, plan history viewer) — the plan history viewer is now done; meal plan assignment (attaching a template to a client) is the one remaining item
 - New direction under discussion: going condition-by-condition to deepen each of the 4 client-facing screens (weight-loss, PCOS, hormonal, skincare) beyond their current baseline feature set
+
+## Session 6 — July 5, 2026 · PCOS deep pass: interactive period tracking, phase-aware plan, cycle progress view
+
+### Summary of what was done this session
+With Phase 2 (15-day cycles) complete, work shifted to going condition-by-condition in depth rather than spreading improvements thin across all 4 at once — PCOS first, since it already had the most infrastructure (period tracker, flow intensity from Session 4). The period calendar went from a read-only visualization to a fully tappable interface. The client-facing Plan and Progress pages — previously identical for every condition — got real PCOS-specific content: cycle-phase-aware meals and a client-facing view of her own period/flow history. A mid-session build error (a botched file edit that nested one function inside another) was caught and fixed before commit.
+
+---
+
+### `lib/store.ts` — Updated
+
+**Before:**
+- `logPeriodStart`, `logPeriodEnd`, `logPeriodFlow` all hardcoded to operate on `"Today"` — no way to log against any other date
+
+**After:**
+- All three now accept an optional `dateLabel` parameter (defaulting to `"Today"` for backward compatibility), so a specific tapped calendar day can be logged against its own real date instead of only ever "today"
+
+**Why:** This is what makes the calendar rewrite below possible — logging a period start on a day other than today needed the store to accept an arbitrary date, not just the current one.
+
+---
+
+### `components/client/PeriodCalendar.tsx` — Rewritten
+
+**Before:** Calendar days were purely a read-only visualization. The only ways to log anything were the fixed "Log period start/end" pill (always "Today") and the "Today's flow" pills (also always "Today"). All period days rendered in one flat color regardless of logged intensity.
+
+**After:**
+- Every non-future calendar day is now tappable
+- Tapping a day with **no active period** opens a confirm sheet to start a period *on that date*
+- Tapping a day **within an active period** opens the light/medium/heavy flow picker *for that date*
+- Tapping a day inside an already-closed past period is a deliberate no-op (editing closed history isn't supported yet)
+- Each day's color now reflects its own logged flow intensity (light/medium/heavy → increasingly saturated rose) instead of one uniform color for the whole period
+- Added a `labelForDate()` helper that converts an actual tapped `Date` back into the app's relative-string format ("Today", "3 days ago"), keeping it compatible with the existing relative-date data model rather than requiring an architecture change
+
+**Why:** Zainab needed to actually see the calendar working during a demo — tapping around and watching it respond live, rather than only being able to act on "today."
+
+---
+
+### `app/(client)/plan/page.tsx` — Updated (two passes)
+
+**Before:** Fully static, identical for every client regardless of condition — even the header pill was hardcoded to `"Gut health reset · week 2"` regardless of who was logged in.
+
+**After (first pass):**
+- Header pill now reads the client's real `planType`
+- Added a PCOS-only phase banner (Menstrual/Follicular/Ovulatory/Luteal) derived from real data — an active period takes priority, otherwise the client's self-logged `cycleDay` — with a nutrition tip per phase. Falls back to a "log your cycle day" prompt if neither is available, rather than guessing.
+
+**After (second pass — closing the loose end):**
+- The phase banner previously sat on top of the *same* generic weekly meals for everyone. Replaced with four real, distinct 7-day meal sets (`pcosPhaseMeals`) — one per phase — so PCOS clients now see meals that actually change with their phase, not just a tip layered over identical content
+- Banner now explicitly states "This week's meals are set for your [phase]"
+
+**Why:** The first pass was honest about being a tip-only addition; closing it properly meant the meals themselves needed to differ, since that's what "phase-aware plan" actually implies.
+
+---
+
+### `app/(client)/progress/page.tsx` — Updated (two passes)
+
+**Before:** Identical for every client — weight/bloating stat cards, weight and energy line charts, monthly recap. No condition-specific content at all.
+
+**After (first pass):**
+- Added a PCOS-only "Your cycle" card: chronological list of period logs with dates and length, plus an average
+- Deliberately labeled as **"period length"**, not "cycle length" — the existing `cycleLength` field on `PeriodLog` actually represents how long the period itself lasted (a 5-day span), not the interval between cycles, and the UI needed to say what the data actually means rather than borrow the wrong medical term
+
+**After (second pass — closing the loose end):**
+- Added `PeriodFlowChart` under the period list — a day-by-day flow visualization for the client's own most recent period
+
+**Why:** This data (period history, flow) previously only existed on Zainab's side of the app (Cycle Report, Plan History). Letting the client see her own cycle data is arguably the most clinically meaningful thing for PCOS self-awareness, and it was sitting in the data model unused on the client side.
+
+---
+
+### `lib/period.ts` — Updated, then bugfixed
+
+**Before:** Only `buildFlowDataForCycle` existed — indexes flow by day-of-*plan*-cycle (Zainab's 15-day nutrition cycle), which is the wrong framing for showing a client her own period.
+
+**After:** Added `buildFlowForPeriod(log)` — indexes flow by day-of-*period* (Day 1, Day 2... of the period itself, span calculated from the log's own start/end dates). Measures an ongoing period up to today if it hasn't ended yet.
+
+**Bug caught before commit:** The first attempt at this edit landed inside the body of `buildFlowDataForCycle` instead of after it — nesting `buildFlowForPeriod`'s declaration inside the older function and leaving `buildFlowDataForCycle` without a closing return, which cascaded into implicit-`any` errors everywhere `buildFlowForPeriod` was consumed (`PeriodFlowChart.tsx` showed 6 of the 10 reported problems, all downstream of this one break, not actual bugs in that file). Rewrote the file cleanly and verified brace balance programmatically before re-sending it.
+
+**Why:** Two functions answering genuinely different questions ("how did this nutrition cycle look" vs. "how did this period look") shouldn't share one implementation — keeping them separate avoids one subtly wrong for the other's use case.
+
+---
+
+### `components/client/PeriodFlowChart.tsx` — New file
+
+Client-facing flow chart, period-day-indexed (via `buildFlowForPeriod`), visually consistent with the rose bar-strip pattern already established elsewhere in the app. Distinct from `PeriodFlowStrip.tsx` in `components/nutritionist/` — kept as separate files rather than sharing one component across the client/nutritionist folder boundary, since they're indexed differently (period-day vs. plan-cycle-day) and serve different audiences.
+
+---
+
+### Git details
+
+Commit:   13e42cb
+Message:  "pcos done"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 7
+Insertions:    +731
+Deletions:     -50
+New files created:
+components/client/PeriodFlowChart.tsx
+Modified files:
+lib/store.ts
+lib/period.ts
+components/client/PeriodCalendar.tsx
+app/(client)/plan/page.tsx
+app/(client)/progress/page.tsx
+
+*(Git reports 7 files changed; 6 are accounted for above — the 7th may be an auto-regenerated build artifact such as `next-env.d.ts`, which has appeared in prior commits without being a deliberate edit.)*
+
+---
+
+### What's next
+- PCOS is now feature-complete across Home, Plan, and Progress (Chat intentionally left generic per scope)
+- Next condition queued: **Weight loss** — Home already has goal-tracking; open territory is Plan (portion/calorie-conscious guidance) and Progress (a visible link between logged activity and weight trend, beyond the existing weight chart alone)
+
