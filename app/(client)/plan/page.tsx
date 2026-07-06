@@ -135,6 +135,81 @@ function getHormonalSummary(client: { checkinHistory?: ({ mood?: number; sleepHo
   };
 }
 
+const skincareWeekMeals: Record<string, { label: string; items: string }[]> = {
+  Mon: [
+    { label: "Breakfast", items: "Green smoothie, chia seeds, soaked almonds" },
+    { label: "Lunch", items: "Quinoa salad, cucumber, avocado, lemon dressing" },
+    { label: "Dinner", items: "Grilled salmon, steamed broccoli, brown rice" },
+  ],
+  Tue: [
+    { label: "Breakfast", items: "Berry and flaxseed smoothie" },
+    { label: "Lunch", items: "Chickpea salad, roasted pumpkin seeds" },
+    { label: "Dinner", items: "Grilled fish, sauteed spinach" },
+  ],
+  Wed: [
+    { label: "Breakfast", items: "Overnight oats, walnuts" },
+    { label: "Lunch", items: "Quinoa and avocado bowl, mixed greens" },
+    { label: "Dinner", items: "Turmeric lentil soup, brown rice" },
+  ],
+  Thu: [
+    { label: "Breakfast", items: "Green smoothie, pumpkin seeds" },
+    { label: "Lunch", items: "Grilled tofu salad, olive oil dressing" },
+    { label: "Dinner", items: "Baked fish, roasted vegetables" },
+  ],
+  Fri: [
+    { label: "Breakfast", items: "Chia pudding, mixed berries" },
+    { label: "Lunch", items: "Quinoa and avocado bowl" },
+    { label: "Dinner", items: "Grilled chicken, sauteed greens, sweet potato" },
+  ],
+  Sat: [
+    { label: "Breakfast", items: "Herbal tea, soaked almonds, fruit" },
+    { label: "Lunch", items: "Lentil and vegetable soup, multigrain toast" },
+    { label: "Dinner", items: "Grilled salmon, steamed broccoli" },
+  ],
+  Sun: [
+    { label: "Breakfast", items: "Green smoothie bowl" },
+    { label: "Lunch", items: "Chickpea and cucumber salad" },
+    { label: "Dinner", items: "Turmeric baked tofu, brown rice, greens" },
+  ],
+};
+
+/**
+ * Real, data-driven only — computed from the client's actual logged
+ * skinCondition history, not fabricated. Needs at least 2 logged days to
+ * say anything; compares the most recent entries against the ones before
+ * to detect a real direction rather than guessing.
+ */
+function getSkincareSummary(client: { checkinHistory?: ({ skinCondition?: number } | null)[] }) {
+  const logged = (client.checkinHistory ?? [])
+    .filter((h): h is { skinCondition?: number } => h !== null)
+    .map((h) => h.skinCondition)
+    .filter((v): v is number => v !== undefined);
+
+  if (logged.length < 2) return null;
+
+  const recent = logged.slice(-2);
+  const prior = logged.slice(-5, -2);
+  const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const priorAvg = prior.length ? prior.reduce((a, b) => a + b, 0) / prior.length : recentAvg;
+
+  if (recentAvg < priorAvg - 0.3) {
+    return {
+      headline: "Your skin has been improving",
+      tip: "Whatever's been working — keep the no-dairy, low-sugar rhythm going. This week's meals stay anti-inflammatory to support it.",
+    };
+  }
+  if (recentAvg > priorAvg + 0.3) {
+    return {
+      headline: "A rougher stretch recently",
+      tip: "Zinc and omega-3-rich foods (pumpkin seeds, salmon) help calm flare-ups — this week's meals lean into both, and hitting your water goal matters more than usual right now.",
+    };
+  }
+  return {
+    headline: "Skin's been steady",
+    tip: "Consistency is doing the work here — this week's meals keep the same anti-inflammatory, dairy-free approach.",
+  };
+}
+
 type PcosPhaseKey = "menstrual" | "follicular" | "ovulatory" | "luteal";
 
 const pcosPhaseMeals: Record<PcosPhaseKey, Record<string, { label: string; items: string }[]>> = {
@@ -339,11 +414,14 @@ export default function ClientPlanPage() {
     client.condition === "pcos" ? getPcosPhase(hasActivePeriod, client.todayCheckin?.cycleDay) : null;
   const weightLossSummary = client.condition === "weight-loss" ? getWeightLossSummary(client) : null;
   const hormonalSummary = client.condition === "hormonal" ? getHormonalSummary(client) : null;
+  const skincareSummary = client.condition === "skincare" ? getSkincareSummary(client) : null;
 
   const activeMeals = pcosPhase
     ? pcosPhaseMeals[pcosPhase.key]
     : client.condition === "weight-loss"
     ? weightLossWeekMeals
+    : client.condition === "skincare"
+    ? skincareWeekMeals
     : weekMeals;
 
   return (
@@ -410,6 +488,28 @@ export default function ClientPlanPage() {
             <div className="bg-sage-50 border border-sage-100 rounded-xl p-4">
               <p className="text-xs text-moss-600">
                 Log a few daily check-ins to see personalised mood and sleep insights here.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {client.condition === "skincare" && (
+        <div className="mt-4">
+          {skincareSummary ? (
+            <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                  <span className="text-sm">✨</span>
+                </div>
+                <p className="text-sm font-medium text-teal-800">{skincareSummary.headline}</p>
+              </div>
+              <p className="text-xs text-moss-600 leading-relaxed">{skincareSummary.tip}</p>
+            </div>
+          ) : (
+            <div className="bg-sage-50 border border-sage-100 rounded-xl p-4">
+              <p className="text-xs text-moss-600">
+                Log a few daily skin condition check-ins to see personalised insights here.
               </p>
             </div>
           )}

@@ -55,6 +55,8 @@ export default function ClientProgressPage() {
   const activityData = (client.checkinHistory ?? []).map((h) => h?.activityMinutes ?? null);
   const hormonalMoodData = (client.checkinHistory ?? []).map((h) => h?.mood ?? null);
   const hormonalSleepData = (client.checkinHistory ?? []).map((h) => h?.sleepHours ?? null);
+  const skincareSkinData = (client.checkinHistory ?? []).map((h) => h?.skinCondition ?? null);
+  const skincareWaterData = (client.checkinHistory ?? []).map((h) => h?.waterGlasses ?? null);
 
   return (
     <div className="pt-12 px-5">
@@ -163,6 +165,29 @@ export default function ClientProgressPage() {
             totalDays={client.planCycle.totalDays}
             max={9}
             colorClass="bg-violet-300"
+            unitLabel="days logged"
+          />
+        </Card>
+      )}
+
+      {client.condition === "skincare" && (
+        <Card className="mb-5">
+          <p className="text-sm font-medium text-moss-600 mb-1">Skin & hydration this cycle</p>
+          <p className="text-xs text-moss-400 mb-1">Lower skin condition scores mean clearer skin.</p>
+          <ActivityBarStrip
+            label="Skin condition (0–10)"
+            data={skincareSkinData}
+            totalDays={client.planCycle.totalDays}
+            max={10}
+            colorClass="bg-teal-400"
+            unitLabel="days logged"
+          />
+          <ActivityBarStrip
+            label="Water (glasses)"
+            data={skincareWaterData}
+            totalDays={client.planCycle.totalDays}
+            max={client.todayPlan.water.goal}
+            colorClass="bg-sage-400"
             unitLabel="days logged"
           />
         </Card>

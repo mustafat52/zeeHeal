@@ -20,7 +20,16 @@ export function SkincareHome({ client }: { client: Client }) {
   );
 
   const scoreIndex = skinScore !== null ? Math.min(Math.floor(skinScore / 2.5), 4) : null;
-  const recentWeek = [2, 3, 4, 3, 2, skinScore ?? 3, skinScore ?? 3].slice(-7);
+
+  // Real data only: checkinHistory is indexed by cycle day, so we show the
+  // last (up to) 7 real logged days rather than the previous fabricated
+  // array that faked 5 days of history regardless of what actually happened.
+  const history = client.checkinHistory ?? [];
+  const currentDay = client.planCycle.currentDay;
+  const startIdx = Math.max(0, currentDay - 7);
+  const recentSlice = history.slice(startIdx, currentDay);
+  const recentSkin = recentSlice.map((h) => h?.skinCondition ?? null);
+  const recentDayLabels = recentSlice.map((_, i) => `D${startIdx + i + 1}`);
 
   return (
     <div>
@@ -69,9 +78,16 @@ export function SkincareHome({ client }: { client: Client }) {
         </div>
 
         <div className="bg-white rounded-xl border border-sage-100/60 shadow-card p-3.5">
-          <p className="text-xs font-medium text-moss-600 mb-2">Skin condition this week</p>
+          <p className="text-xs font-medium text-moss-600 mb-2">Skin condition, recent days</p>
           <div className="flex items-end gap-1 h-12">
-            {recentWeek.map((v, i) => {
+            {recentSkin.map((v, i) => {
+              if (v === null) {
+                return (
+                  <div key={i} className="flex-1 flex flex-col justify-end">
+                    <div className="h-1 rounded-full bg-moss-900/10" />
+                  </div>
+                );
+              }
               const idx = Math.min(Math.floor(v / 2.5), 4);
               return (
                 <div key={i} className="flex-1 flex flex-col justify-end">
@@ -84,8 +100,8 @@ export function SkincareHome({ client }: { client: Client }) {
             })}
           </div>
           <div className="flex gap-1 mt-1">
-            {["M","T","W","T","F","S","Today"].map((d, i) => (
-              <p key={i} className="flex-1 text-center text-[9px] text-moss-400">{d}</p>
+            {recentDayLabels.map((d) => (
+              <p key={d} className="flex-1 text-center text-[9px] text-moss-400">{d}</p>
             ))}
           </div>
         </div>

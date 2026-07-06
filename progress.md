@@ -977,3 +977,118 @@ app/(client)/progress/page.tsx
 - PCOS is now feature-complete across Home, Plan, and Progress (Chat intentionally left generic per scope)
 - Next condition queued: **Weight loss** — Home already has goal-tracking; open territory is Plan (portion/calorie-conscious guidance) and Progress (a visible link between logged activity and weight trend, beyond the existing weight chart alone)
 
+## Session 7 — July 5, 2026 · Data field audit (config-driven reports) + Hormonal deep pass
+
+### Summary of what was done this session
+Two related bodies of work landed in one commit. First, a full audit of every data field in the model to check whether Zainab's side actually surfaces it — this caught a real architectural bug (charts hardcoded per *condition* instead of per-client `checkinConfig`) and two smaller display gaps, all fixed. Second, the Hormonal deep pass (Plan + Progress), following the same pattern used for PCOS and weight-loss — plus a fix caught along the way: `HormonalHome`'s headline chart was quietly using fabricated mock data instead of the real `checkinHistory` that now exists.
+
+---
+
+### `lib/checkinCharts.ts` — New file
+
+**The core fix of this session.** Previously, `CycleReportModal` and `PlanHistoryModal` each hardcoded which daily chart appeared per *condition* — e.g. "weight-loss gets Activity, PCOS/hormonal get Mood, skincare gets Skin condition." This silently broke the moment a client's `checkinConfig` (genuinely per-client customizable via `ClientProfileFormModal`) didn't match that assumption — Ananya has `hairFall` toggled on, but there was never a chart for it anywhere, because the code checked her condition, not her config.
+
+**After:** `getConfiguredChartFields(client, history)` iterates the client's actual `checkinConfig` and returns a chart definition for every field that's both turned on for that specific client and chartable. `weight` and `cycleDay` are deliberately excluded (documented in-file) — weight already has a dedicated trend card better suited to a slow-moving number, and `cycleDay` is fully covered by the existing period calendar/flow chart.
+
+**Why:** One shared function means the live report and the history viewer can't drift out of sync with each other, and adding a field to a client's check-in config now automatically makes it appear in every report — no per-condition logic to remember to update.
+
+---
+
+### `components/nutritionist/CycleReportModal.tsx` — Updated
+
+**Before:** Manually extracted `sleepData`, `waterData`, `activityData`, `moodData`, `skinData` and rendered a hardcoded subset per condition. PCOS period card showed log count and active-flag only.
+
+**After:** Replaced all manual extraction with `getConfiguredChartFields`; renders one `DailyBarStrip` per configured field, in place of the old per-condition subset. Added period **length** to the PCOS card (`"last was 5 days"`) — this was real data (`PeriodLog.cycleLength`) that Zainab could never previously see, despite it already being shown to the client on their own Progress page.
+
+---
+
+### `components/nutritionist/PlanHistoryModal.tsx` — Updated
+
+Same refactor as `CycleReportModal` — archived cycles now render the same config-driven chart set as the live report, using the archived `CycleSnapshot.checkinHistory` instead of the live one.
+
+---
+
+### `app/(nutritionist)/client/[id]/page.tsx` — Updated
+
+**Before:** "Today's check-in" card was missing `mood` and `waterGlasses` entirely — both collectible via `checkinConfig`, neither ever displayed. No visibility anywhere into individual meal logs (photos/notes clients attach via `LogMealModal`).
+
+**After:**
+- Added `mood` (as emoji) and `waterGlasses` to the check-in card
+- Added a new "Today's meals" card — lists each meal with a Logged/Pending pill, and surfaces the client's own note (quoted) and a "📷 Photo attached" indicator if present
+
+**Why:** These were real fields sitting in the shared Zustand store the whole time — the data existed, there was just no nutritionist-facing component rendering it.
+
+---
+
+### `DATA_AUDIT.md` — New file
+
+Durable project doc cataloguing every field in the data model: where it's collected, where the client sees it, where Zainab sees it. Flags two gaps that were **not** silently fixed, since they require new authoring UI rather than a display fix:
+1. `monthlyRecap` — presented to the client as a note "from Zainab," but no reviewed file lets Zainab actually write or edit it
+2. Per-meal `reasoning` text — same shape of gap
+
+Both are earmarked for whenever "Zainab writes/edits her own content" gets designed as its own feature, rather than patched in ad hoc.
+
+---
+
+### `components/client/homes/HormonalHome.tsx` — Updated
+
+**Before:** The "Mood & energy this week" chart used hardcoded `mockMoodHistory`/`mockEnergyHistory` arrays — fabricated data on the app's own headline chart for this condition, discovered while starting the Hormonal deep pass.
+
+**After:**
+- Mood now pulls from real `checkinHistory`, showing the last (up to) 7 real logged cycle-days rather than a fixed calendar week
+- The fabricated "Energy" series was replaced with **Sleep** — a real per-day field. Energy genuinely has no daily granularity anywhere in the data model (only a weekly snapshot in `progress[]`), so faking a 7-day energy chart would have been dishonest; Sleep is the real per-day proxy that was already being collected
+- Day labels changed from Mon–Sun to `D6`–`D12` style (actual cycle-day numbers) since `checkinHistory` is cycle-day-indexed, not calendar-weekday-indexed — labeling it as if it lined up with the calendar would have been its own small inaccuracy
+
+---
+
+### `components/client/ActivityBarStrip.tsx` — Generalized
+
+**Before:** Hardcoded label ("Activity this cycle") and unit text ("days active") — single-purpose, built only for the weight-loss Progress page.
+
+**After:** Accepts `label`, `colorClass`, and `unitLabel` as props. The one existing call site (weight-loss Progress page) was updated to pass these explicitly rather than relying on internal defaults.
+
+**Why:** Rather than write a third near-identical bar-chart component for Hormonal's Mood/Sleep view, the existing one was widened to serve all three conditions that need a labeled daily bar chart on the client's own Progress page.
+
+---
+
+### `app/(client)/plan/page.tsx` — Updated
+
+**Added `getHormonalSummary()`** — computes a real trend from the client's last 5 logged `checkinHistory` entries (average mood, average sleep), not fabricated. Mood dip takes priority over short sleep in what gets surfaced. Falls back to a "log a few check-ins" prompt if there isn't enough history yet.
+
+**Deliberately did not add a Hormonal-specific meal set** the way PCOS and weight-loss got one — Priya's existing generic weekly meals are, by history, literally her original gut-health-reset plan (from before her condition was reassigned to hormonal in Session 2), and already suit this condition's needs. Manufacturing a near-duplicate 7-day set for symmetry with the other conditions would have been content for its own sake, not a real improvement.
+
+---
+
+### `app/(client)/progress/page.tsx` — Updated
+
+Added a "Mood & sleep this cycle" card for hormonal clients — two `ActivityBarStrip` charts (Mood, Sleep) sourced from the same `checkinHistory` already powering Zainab's Cycle Report. Same pattern as PCOS's flow chart and weight-loss's activity chart: data already collected for the nutritionist's report, now also shown to the client themselves.
+
+---
+
+### Git detailsCommit:   7862c85
+
+Message:  "Hormone"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 9
+Insertions:    +335
+Deletions:     -67
+New files created:
+DATA_AUDIT.md
+lib/checkinCharts.ts
+Modified files:
+components/nutritionist/CycleReportModal.tsx
+components/nutritionist/PlanHistoryModal.tsx
+app/(nutritionist)/client/[id]/page.tsx
+components/client/ActivityBarStrip.tsx
+components/client/homes/HormonalHome.tsx
+app/(client)/plan/page.tsx
+app/(client)/progress/page.tsx
+
+
+---
+
+### What's next
+- Hormonal is now feature-complete across Home, Plan, and Progress
+- **Skincare** is the last condition in the queue — same shape of work: identify what's collected but underused on the client's own screens (per `DATA_AUDIT.md`'s method), and add it without touching the other three
+- Two flagged gaps from the audit (`monthlyRecap` and meal `reasoning` authoring) remain open, earmarked for when Zainab's own content-authoring tools get designed
