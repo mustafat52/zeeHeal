@@ -9,18 +9,19 @@ import { LogoutButton } from "@/components/ui/LogoutButton";
 import { Droplets, Flame, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 const moodEmojis = ["😞", "😕", "🙂", "😊", "🤩"];
-const mockMoodHistory = [3, 4, 2, 3, 4, 4, 3];
-const mockEnergyHistory = [4, 5, 3, 4, 5, 6, 5];
-const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+function MiniBar({ value, max, color }: { value: number | null; max: number; color: string }) {
   return (
     <div className="flex-1 flex flex-col items-center gap-1">
       <div className="w-full h-16 flex items-end justify-center">
-        <div
-          className={`w-3 rounded-t-sm ${color}`}
-          style={{ height: `${(value / max) * 100}%` }}
-        />
+        {value !== null ? (
+          <div
+            className={`w-3 rounded-t-sm ${color}`}
+            style={{ height: `${(value / max) * 100}%` }}
+          />
+        ) : (
+          <div className="w-3 h-1 rounded-full bg-moss-900/10" />
+        )}
       </div>
     </div>
   );
@@ -38,6 +39,20 @@ export function HormonalHome({ client }: { client: Client }) {
   const EnergyIcon = energyChange > 0 ? TrendingUp : energyChange < 0 ? TrendingDown : Minus;
   const energyColor = energyChange > 0 ? "text-sage-600" : energyChange < 0 ? "text-clay-600" : "text-moss-400";
 
+  // Real data only: checkinHistory is indexed by cycle day, not calendar
+  // weekday, so we show the last (up to) 7 real entries leading up to today
+  // rather than pretending they line up with Mon–Sun. Energy has no daily
+  // field anywhere in the data model (only a weekly snapshot in `progress`),
+  // so the second series is Sleep — a real per-day field — instead of a
+  // fabricated daily energy number.
+  const history = client.checkinHistory ?? [];
+  const currentDay = client.planCycle.currentDay;
+  const startIdx = Math.max(0, currentDay - 7);
+  const recentSlice = history.slice(startIdx, currentDay);
+  const recentMood = recentSlice.map((h) => h?.mood ?? null);
+  const recentSleep = recentSlice.map((h) => h?.sleepHours ?? null);
+  const recentDayLabels = recentSlice.map((_, i) => `D${startIdx + i + 1}`);
+
   return (
     <div>
       <div className="bg-violet-50 px-6 pt-12 pb-6 rounded-b-[28px]">
@@ -53,19 +68,19 @@ export function HormonalHome({ client }: { client: Client }) {
 
       <div className="px-5 mt-4 flex flex-col gap-3">
         <div className="bg-white rounded-xl border border-sage-100/60 shadow-card p-3.5">
-          <p className="text-xs font-medium text-moss-600 mb-3">Mood & energy this week</p>
+          <p className="text-xs font-medium text-moss-600 mb-3">Mood & sleep, recent days</p>
           <div className="flex gap-1 mb-1">
-            {mockMoodHistory.map((v, i) => (
+            {recentMood.map((v, i) => (
               <MiniBar key={i} value={v} max={5} color="bg-violet-200" />
             ))}
           </div>
           <div className="flex gap-1 mb-2">
-            {mockEnergyHistory.map((v, i) => (
-              <MiniBar key={i} value={v} max={7} color="bg-violet-500" />
+            {recentSleep.map((v, i) => (
+              <MiniBar key={i} value={v} max={9} color="bg-violet-500" />
             ))}
           </div>
           <div className="flex gap-1">
-            {dayLabels.map((d) => (
+            {recentDayLabels.map((d) => (
               <p key={d} className="flex-1 text-center text-[9px] text-moss-400">{d}</p>
             ))}
           </div>
@@ -74,7 +89,7 @@ export function HormonalHome({ client }: { client: Client }) {
               <span className="w-2 h-2 rounded-sm bg-violet-200 inline-block" /> Mood
             </span>
             <span className="flex items-center gap-1 text-[10px] text-moss-400">
-              <span className="w-2 h-2 rounded-sm bg-violet-500 inline-block" /> Energy
+              <span className="w-2 h-2 rounded-sm bg-violet-500 inline-block" /> Sleep
             </span>
           </div>
         </div>

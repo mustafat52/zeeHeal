@@ -142,6 +142,20 @@ export default function ClientDetailPage() {
                 <p className="text-sm font-medium text-moss-900">{client.todayCheckin.sleepHours} hrs</p>
               </div>
             )}
+            {client.todayCheckin.mood !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Mood</p>
+                <p className="text-sm font-medium text-moss-900">
+                  {["😞", "😕", "🙂", "😊", "🤩"][client.todayCheckin.mood - 1] ?? client.todayCheckin.mood}
+                </p>
+              </div>
+            )}
+            {client.todayCheckin.waterGlasses !== undefined && (
+              <div>
+                <p className="text-xs text-moss-400">Water</p>
+                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.waterGlasses} glasses</p>
+              </div>
+            )}
             {client.todayCheckin.bloating !== undefined && (
               <div>
                 <p className="text-xs text-moss-400">Bloating</p>
@@ -182,6 +196,31 @@ export default function ClientDetailPage() {
           )}
         </Card>
       )}
+
+      <Card className="mb-5">
+        <p className="text-sm font-medium text-moss-600 mb-3">Today&apos;s meals</p>
+        <div className="flex flex-col gap-2.5">
+          {client.todayPlan.meals.map((meal) => (
+            <div key={meal.id} className="flex items-start justify-between gap-3 pb-2.5 border-b border-sage-100 last:border-0 last:pb-0">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-moss-900">{meal.label}</p>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${meal.status === "done" ? "bg-sage-100 text-sage-700" : "bg-moss-900/5 text-moss-400"}`}>
+                    {meal.status === "done" ? "Logged" : "Pending"}
+                  </span>
+                </div>
+                <p className="text-xs text-moss-400 mt-0.5">{meal.items}</p>
+                {meal.log?.note && (
+                  <p className="text-xs text-moss-600 italic mt-1.5">&quot;{meal.log.note}&quot;</p>
+                )}
+                {meal.log?.photo && (
+                  <p className="text-[10px] text-sage-600 mt-1">📷 Photo attached</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card className="mb-5">
         <p className="text-sm font-medium text-moss-600 mb-3">Weight trend</p>

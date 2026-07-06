@@ -5,21 +5,27 @@ function barHeight(value: number, max: number) {
 }
 
 export function ActivityBarStrip({
+  label,
   data,
   totalDays,
-  max = 40,
+  max,
+  colorClass,
+  unitLabel = "days logged",
 }: {
+  label: string;
   data: (number | null | undefined)[];
   totalDays: number;
-  max?: number;
+  max: number;
+  colorClass: string;
+  unitLabel?: string;
 }) {
   const loggedCount = data.slice(0, totalDays).filter((v) => v !== null && v !== undefined).length;
 
   return (
     <div className="mt-3 pt-3 border-t border-sage-100">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-medium text-moss-600">Activity this cycle</p>
-        <span className="text-[10px] text-moss-400">{loggedCount}/{totalDays} days active</span>
+        <p className="text-xs font-medium text-moss-600">{label}</p>
+        <span className="text-[10px] text-moss-400">{loggedCount}/{totalDays} {unitLabel}</span>
       </div>
       <div className="flex items-end gap-1 h-10">
         {Array.from({ length: totalDays }, (_, i) => {
@@ -28,7 +34,7 @@ export function ActivityBarStrip({
           return (
             <div key={i} className="flex-1 flex flex-col justify-end h-full">
               {has ? (
-                <div className="rounded-t-sm bg-amber-400" style={{ height: `${barHeight(v as number, max)}%` }} />
+                <div className={`rounded-t-sm ${colorClass}`} style={{ height: `${barHeight(v as number, max)}%` }} />
               ) : (
                 <div className="h-[3px] rounded-full bg-moss-900/10" />
               )}

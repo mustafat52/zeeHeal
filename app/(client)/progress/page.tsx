@@ -53,6 +53,8 @@ export default function ClientProgressPage() {
       : 100
     : 0;
   const activityData = (client.checkinHistory ?? []).map((h) => h?.activityMinutes ?? null);
+  const hormonalMoodData = (client.checkinHistory ?? []).map((h) => h?.mood ?? null);
+  const hormonalSleepData = (client.checkinHistory ?? []).map((h) => h?.sleepHours ?? null);
 
   return (
     <div className="pt-12 px-5">
@@ -130,7 +132,39 @@ export default function ClientProgressPage() {
           {toGo > 0 && (
             <p className="text-xs text-moss-600 mt-2">{toGo} kg to go</p>
           )}
-          <ActivityBarStrip data={activityData} totalDays={client.planCycle.totalDays} />
+          <ActivityBarStrip
+            label="Activity this cycle"
+            data={activityData}
+            totalDays={client.planCycle.totalDays}
+            max={40}
+            colorClass="bg-amber-400"
+            unitLabel="days active"
+          />
+        </Card>
+      )}
+
+      {client.condition === "hormonal" && (
+        <Card className="mb-5">
+          <p className="text-sm font-medium text-moss-600 mb-1">Mood & sleep this cycle</p>
+          <p className="text-xs text-moss-400 mb-1">
+            Real day-by-day data from your check-ins — no guessing, no averages standing in for it.
+          </p>
+          <ActivityBarStrip
+            label="Mood (1–5)"
+            data={hormonalMoodData}
+            totalDays={client.planCycle.totalDays}
+            max={5}
+            colorClass="bg-violet-400"
+            unitLabel="days logged"
+          />
+          <ActivityBarStrip
+            label="Sleep (hrs)"
+            data={hormonalSleepData}
+            totalDays={client.planCycle.totalDays}
+            max={9}
+            colorClass="bg-violet-300"
+            unitLabel="days logged"
+          />
         </Card>
       )}
 

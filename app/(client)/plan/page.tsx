@@ -101,6 +101,40 @@ function getWeightLossSummary(client: { progress: { weight: number }[]; goalWeig
   return { lost, toGo };
 }
 
+/**
+ * Real, data-driven only — computed from the client's actual last few
+ * logged check-ins (checkinHistory), not fabricated. Priority: a dipped
+ * mood matters more than short sleep, so it's checked first. Returns null
+ * if there isn't enough logged history yet to say anything meaningful.
+ */
+function getHormonalSummary(client: { checkinHistory?: ({ mood?: number; sleepHours?: number } | null)[] }) {
+  const logged = (client.checkinHistory ?? []).filter((h): h is { mood?: number; sleepHours?: number } => h !== null);
+  const recent = logged.slice(-5); // last up to 5 real logged days
+  if (recent.length === 0) return null;
+
+  const moods = recent.map((h) => h.mood).filter((v): v is number => v !== undefined);
+  const sleeps = recent.map((h) => h.sleepHours).filter((v): v is number => v !== undefined);
+  const avgMood = moods.length ? moods.reduce((a, b) => a + b, 0) / moods.length : null;
+  const avgSleep = sleeps.length ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length : null;
+
+  if (avgMood !== null && avgMood < 3.5) {
+    return {
+      headline: "Mood's dipped a bit recently",
+      tip: "Magnesium-rich foods — leafy greens, nuts, seeds — and steady blood sugar meals can help support mood balance.",
+    };
+  }
+  if (avgSleep !== null && avgSleep < 6.5) {
+    return {
+      headline: "Sleep's been a bit short this week",
+      tip: "Avoiding heavy or spicy dinners, and a calming tea like chamomile in the evening, can support better rest.",
+    };
+  }
+  return {
+    headline: "Mood and sleep have been steady",
+    tip: "Keep this rhythm going — consistency is doing real work here.",
+  };
+}
+
 type PcosPhaseKey = "menstrual" | "follicular" | "ovulatory" | "luteal";
 
 const pcosPhaseMeals: Record<PcosPhaseKey, Record<string, { label: string; items: string }[]>> = {
@@ -304,6 +338,7 @@ export default function ClientPlanPage() {
   const pcosPhase =
     client.condition === "pcos" ? getPcosPhase(hasActivePeriod, client.todayCheckin?.cycleDay) : null;
   const weightLossSummary = client.condition === "weight-loss" ? getWeightLossSummary(client) : null;
+  const hormonalSummary = client.condition === "hormonal" ? getHormonalSummary(client) : null;
 
   const activeMeals = pcosPhase
     ? pcosPhaseMeals[pcosPhase.key]
@@ -356,6 +391,28 @@ export default function ClientPlanPage() {
               ? `${weightLossSummary.toGo} kg to your goal — this week's meals stay protein and fibre forward to keep you full while you get there.`
               : "You've reached your goal weight — these meals are built to help you maintain it."}
           </p>
+        </div>
+      )}
+
+      {client.condition === "hormonal" && (
+        <div className="mt-4">
+          {hormonalSummary ? (
+            <div className="bg-violet-50 border border-violet-100 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                  <span className="text-sm">🌙</span>
+                </div>
+                <p className="text-sm font-medium text-violet-800">{hormonalSummary.headline}</p>
+              </div>
+              <p className="text-xs text-moss-600 leading-relaxed">{hormonalSummary.tip}</p>
+            </div>
+          ) : (
+            <div className="bg-sage-50 border border-sage-100 rounded-xl p-4">
+              <p className="text-xs text-moss-600">
+                Log a few daily check-ins to see personalised mood and sleep insights here.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

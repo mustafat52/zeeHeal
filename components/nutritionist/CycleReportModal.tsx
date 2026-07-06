@@ -6,6 +6,7 @@ import { PatientProfileCard } from "./PatientProfileCard";
 import { DailyBarStrip } from "./DailyBarStrip";
 import { PeriodFlowStrip } from "./PeriodFlowStrip";
 import { buildFlowDataForCycle } from "@/lib/period";
+import { getConfiguredChartFields } from "@/lib/checkinCharts";
 import { X, TrendingDown, TrendingUp, Minus, Droplets, Target } from "lucide-react";
 
 function trendIcon(change: number) {
@@ -41,13 +42,11 @@ export function CycleReportModal({
     .slice(0, currentDay)
     .filter((h) => h !== null).length;
 
-  const sleepData = history.map((h) => h?.sleepHours ?? null);
-  const waterData = history.map((h) => h?.waterGlasses ?? null);
-  const activityData = history.map((h) => h?.activityMinutes ?? null);
-  const moodData = history.map((h) => h?.mood ?? null);
-  const skinData = history.map((h) => h?.skinCondition ?? null);
+  const chartFields = getConfiguredChartFields(client, history);
   const flowData = buildFlowDataForCycle(client.periodLogs, client.planCycle.startDate, totalDays);
   const hasFlowLogged = flowData.some((v) => v !== null);
+
+  const lastPeriod = client.periodLogs?.[client.periodLogs.length - 1];
 
   return (
     <div
@@ -147,8 +146,9 @@ export function CycleReportModal({
               <p className="text-xs text-moss-400">Period logs</p>
               <p className="text-sm font-medium text-moss-900">
                 {client.periodLogs?.length ?? 0} logged
-                {client.periodLogs && client.periodLogs.length > 0 && !client.periodLogs[client.periodLogs.length - 1].endDate
-                  ? " · period currently active"
+                {lastPeriod && !lastPeriod.endDate ? " · period currently active" : ""}
+                {lastPeriod?.endDate && lastPeriod.cycleLength !== undefined
+                  ? ` · last was ${lastPeriod.cycleLength} days`
                   : ""}
               </p>
               <p className="text-[10px] text-moss-400 mt-0.5">
@@ -160,21 +160,17 @@ export function CycleReportModal({
 
         <p className="text-xs font-medium text-moss-600 mb-2">This cycle, day by day</p>
 
-        <DailyBarStrip label="Sleep (hrs)" data={sleepData} totalDays={totalDays} max={9} colorClass="bg-violet-300" />
-        <DailyBarStrip label="Water (glasses)" data={waterData} totalDays={totalDays} max={client.todayPlan.water.goal} colorClass="bg-sage-400" />
-
-        {client.condition === "weight-loss" && (
-          <DailyBarStrip label="Activity (minutes)" data={activityData} totalDays={totalDays} max={40} colorClass="bg-amber-400" />
-        )}
-        {(client.condition === "pcos" || client.condition === "hormonal") && (
-          <DailyBarStrip label="Mood (1–5)" data={moodData} totalDays={totalDays} max={5} colorClass={client.condition === "pcos" ? "bg-rose-400" : "bg-violet-500"} />
-        )}
-        {client.condition === "pcos" && (
-          <PeriodFlowStrip data={flowData} totalDays={totalDays} />
-        )}
-        {client.condition === "skincare" && (
-          <DailyBarStrip label="Skin condition (0–10, lower is clearer)" data={skinData} totalDays={totalDays} max={10} colorClass="bg-teal-400" />
-        )}
+        {chartFields.map(({ def, data }) => (
+          <DailyBarStrip
+            key={def.key}
+            label={def.label}
+            data={data}
+            totalDays={totalDays}
+            max={def.getMax(client)}
+            colorClass={def.colorClass}
+          />
+        ))}
+        {client.condition === "pcos" && <PeriodFlowStrip data={flowData} totalDays={totalDays} />}
 
         <p className="text-xs font-medium text-moss-600 mb-2 mt-2">Recent notes</p>
         <div className="flex flex-col gap-2 mb-5">

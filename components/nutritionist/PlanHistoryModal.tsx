@@ -6,6 +6,7 @@ import { Client } from "@/lib/mock-data/clients";
 import { DailyBarStrip } from "./DailyBarStrip";
 import { PeriodFlowStrip } from "./PeriodFlowStrip";
 import { buildFlowDataForCycle } from "@/lib/period";
+import { getConfiguredChartFields } from "@/lib/checkinCharts";
 import { X, ChevronDown, History } from "lucide-react";
 
 export function PlanHistoryModal({ client, onClose }: { client: Client; onClose: () => void }) {
@@ -46,11 +47,7 @@ export function PlanHistoryModal({ client, onClose }: { client: Client; onClose:
             const totalDays = cycle.checkinHistory.length;
             const loggedCount = cycle.checkinHistory.filter((h) => h !== null).length;
 
-            const sleepData = cycle.checkinHistory.map((h) => h?.sleepHours ?? null);
-            const waterData = cycle.checkinHistory.map((h) => h?.waterGlasses ?? null);
-            const activityData = cycle.checkinHistory.map((h) => h?.activityMinutes ?? null);
-            const moodData = cycle.checkinHistory.map((h) => h?.mood ?? null);
-            const skinData = cycle.checkinHistory.map((h) => h?.skinCondition ?? null);
+            const chartFields = getConfiguredChartFields(client, cycle.checkinHistory);
             const flowData = buildFlowDataForCycle(client.periodLogs, cycle.startDate, totalDays);
 
             return (
@@ -73,29 +70,16 @@ export function PlanHistoryModal({ client, onClose }: { client: Client; onClose:
 
                 {isOpen && (
                   <div className="px-3.5 pb-3.5">
-                    <DailyBarStrip label="Sleep (hrs)" data={sleepData} totalDays={totalDays} max={9} colorClass="bg-violet-300" />
-                    <DailyBarStrip
-                      label="Water (glasses)"
-                      data={waterData}
-                      totalDays={totalDays}
-                      max={client.todayPlan.water.goal}
-                      colorClass="bg-sage-400"
-                    />
-                    {client.condition === "weight-loss" && (
-                      <DailyBarStrip label="Activity (minutes)" data={activityData} totalDays={totalDays} max={40} colorClass="bg-amber-400" />
-                    )}
-                    {(client.condition === "pcos" || client.condition === "hormonal") && (
+                    {chartFields.map(({ def, data }) => (
                       <DailyBarStrip
-                        label="Mood (1–5)"
-                        data={moodData}
+                        key={def.key}
+                        label={def.label}
+                        data={data}
                         totalDays={totalDays}
-                        max={5}
-                        colorClass={client.condition === "pcos" ? "bg-rose-400" : "bg-violet-500"}
+                        max={def.getMax(client)}
+                        colorClass={def.colorClass}
                       />
-                    )}
-                    {client.condition === "skincare" && (
-                      <DailyBarStrip label="Skin condition (0–10, lower is clearer)" data={skinData} totalDays={totalDays} max={10} colorClass="bg-teal-400" />
-                    )}
+                    ))}
                     {client.condition === "pcos" && <PeriodFlowStrip data={flowData} totalDays={totalDays} />}
                   </div>
                 )}
