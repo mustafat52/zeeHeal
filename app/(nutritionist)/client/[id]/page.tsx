@@ -12,7 +12,7 @@ import { CycleReportModal } from "@/components/nutritionist/CycleReportModal";
 import { PlanHistoryModal } from "@/components/nutritionist/PlanHistoryModal";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History } from "lucide-react";
+import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History, PenLine } from "lucide-react";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -112,6 +112,19 @@ export default function ClientDetailPage() {
           </div>
         </button>
       </div>
+
+      <button
+        onClick={() => router.push(`/client/${client.id}/notes`)}
+        className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 shadow-card rounded-xl p-3.5 mb-5"
+      >
+        <div className="w-9 h-9 rounded-full bg-moss-900/5 flex items-center justify-center shrink-0">
+          <PenLine size={16} className="text-moss-600" />
+        </div>
+        <div className="text-left flex-1">
+          <p className="text-sm font-medium text-moss-900">Notes &amp; plan reasoning</p>
+          <p className="text-xs text-moss-400">Monthly note, meal reasoning, session notes</p>
+        </div>
+      </button>
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         <Card>

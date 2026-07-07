@@ -21,6 +21,9 @@ interface AppState {
   logPeriodEnd: (clientId: string, dateLabel?: string) => void;
   logPeriodFlow: (clientId: string, intensity: FlowIntensity, dateLabel?: string) => void;
   renewPlanCycle: (clientId: string) => void;
+  setMonthlyRecap: (clientId: string, text: string) => void;
+  setMealReasoning: (clientId: string, mealId: string, reasoning: string) => void;
+  addSessionNote: (clientId: string, text: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -177,6 +180,37 @@ export const useAppStore = create<AppState>((set) => ({
           // lives in cycleHistory instead of being discarded.
           checkinHistory: Array.from({ length: 15 }, () => null),
         };
+      }),
+    })),
+
+  setMonthlyRecap: (clientId, text) =>
+    set((state) => ({
+      clients: state.clients.map((c) =>
+        c.id === clientId ? { ...c, monthlyRecap: text } : c
+      ),
+    })),
+
+  setMealReasoning: (clientId, mealId, reasoning) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+        return {
+          ...c,
+          todayPlan: {
+            ...c.todayPlan,
+            meals: c.todayPlan.meals.map((m) =>
+              m.id === mealId ? { ...m, reasoning } : m
+            ),
+          },
+        };
+      }),
+    })),
+
+  addSessionNote: (clientId, text) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+        return { ...c, notes: [{ date: "Today", text }, ...c.notes] };
       }),
     })),
 }));
