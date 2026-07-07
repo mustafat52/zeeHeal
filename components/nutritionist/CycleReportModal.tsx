@@ -7,6 +7,12 @@ import { DailyBarStrip } from "./DailyBarStrip";
 import { PeriodFlowStrip } from "./PeriodFlowStrip";
 import { buildFlowDataForCycle } from "@/lib/period";
 import { getConfiguredChartFields } from "@/lib/checkinCharts";
+import {
+  getPcosPhase,
+  getWeightLossSummary,
+  getHormonalSummary,
+  getSkincareSummary,
+} from "@/lib/conditionSummaries";
 import { X, TrendingDown, TrendingUp, Minus, Droplets, Target } from "lucide-react";
 
 function trendIcon(change: number) {
@@ -42,6 +48,17 @@ export function CycleReportModal({
     .slice(0, currentDay)
     .filter((h) => h !== null).length;
 
+  // Same functions the client's own Plan page uses — whatever conclusion
+  // she saw there, Zainab sees the identical statement here, rather than
+  // having to re-derive it herself from the raw charts below.
+  const hasActivePeriod =
+    !!client.periodLogs?.length && !client.periodLogs[client.periodLogs.length - 1].endDate;
+  const pcosPhase =
+    client.condition === "pcos" ? getPcosPhase(hasActivePeriod, client.todayCheckin?.cycleDay) : null;
+  const weightLossSummary = client.condition === "weight-loss" ? getWeightLossSummary(client) : null;
+  const hormonalSummary = client.condition === "hormonal" ? getHormonalSummary(client) : null;
+  const skincareSummary = client.condition === "skincare" ? getSkincareSummary(client) : null;
+
   const chartFields = getConfiguredChartFields(client, history);
   const flowData = buildFlowDataForCycle(client.periodLogs, client.planCycle.startDate, totalDays);
   const hasFlowLogged = flowData.some((v) => v !== null);
@@ -73,6 +90,38 @@ export function CycleReportModal({
         <h2 className="font-display text-2xl text-moss-900 mb-4">{client.name}</h2>
 
         <PatientProfileCard client={client} />
+
+        {(pcosPhase || weightLossSummary || hormonalSummary || skincareSummary) && (
+          <div className="bg-moss-900/[0.03] border border-moss-900/10 rounded-xl p-3.5 mb-4">
+            <p className="text-[10px] font-medium text-moss-400 mb-1.5">
+              At a glance — same as what {client.name.split(" ")[0]} sees on their Plan page
+            </p>
+            {pcosPhase && (
+              <>
+                <p className="text-sm font-medium text-moss-900">{pcosPhase.phase}</p>
+                <p className="text-xs text-moss-600 mt-0.5">{pcosPhase.tip}</p>
+              </>
+            )}
+            {weightLossSummary && (
+              <p className="text-sm font-medium text-moss-900">
+                {weightLossSummary.lost > 0 ? `${weightLossSummary.lost} kg lost so far` : "Just getting started"}
+                {weightLossSummary.toGo > 0 ? ` · ${weightLossSummary.toGo} kg to goal` : ""}
+              </p>
+            )}
+            {hormonalSummary && (
+              <>
+                <p className="text-sm font-medium text-moss-900">{hormonalSummary.headline}</p>
+                <p className="text-xs text-moss-600 mt-0.5">{hormonalSummary.tip}</p>
+              </>
+            )}
+            {skincareSummary && (
+              <>
+                <p className="text-sm font-medium text-moss-900">{skincareSummary.headline}</p>
+                <p className="text-xs text-moss-600 mt-0.5">{skincareSummary.tip}</p>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-white rounded-xl border border-sage-100/60 p-3.5">

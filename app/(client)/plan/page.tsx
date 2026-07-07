@@ -6,6 +6,13 @@ import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Droplet, Target } from "lucide-react";
 import clsx from "clsx";
+import {
+  getPcosPhase,
+  getWeightLossSummary,
+  getHormonalSummary,
+  getSkincareSummary,
+  PcosPhaseKey,
+} from "@/lib/conditionSummaries";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -85,56 +92,6 @@ const weightLossWeekMeals: Record<string, { label: string; items: string }[]> = 
   ],
 };
 
-/**
- * Real numbers only — no calorie/macro estimates. This app has stayed
- * qualitative everywhere (reasoning text, not numeric targets), and
- * weight-loss is exactly the condition where introducing calorie-counting
- * for the first time carries real risk. kg progress is the one number
- * already used throughout the app, so it's kept as the only figure here.
- */
-function getWeightLossSummary(client: { progress: { weight: number }[]; goalWeight?: number }) {
-  if (client.goalWeight === undefined || client.progress.length === 0) return null;
-  const start = client.progress[0].weight;
-  const current = client.progress[client.progress.length - 1].weight;
-  const lost = parseFloat((start - current).toFixed(1));
-  const toGo = parseFloat((current - client.goalWeight).toFixed(1));
-  return { lost, toGo };
-}
-
-/**
- * Real, data-driven only — computed from the client's actual last few
- * logged check-ins (checkinHistory), not fabricated. Priority: a dipped
- * mood matters more than short sleep, so it's checked first. Returns null
- * if there isn't enough logged history yet to say anything meaningful.
- */
-function getHormonalSummary(client: { checkinHistory?: ({ mood?: number; sleepHours?: number } | null)[] }) {
-  const logged = (client.checkinHistory ?? []).filter((h): h is { mood?: number; sleepHours?: number } => h !== null);
-  const recent = logged.slice(-5); // last up to 5 real logged days
-  if (recent.length === 0) return null;
-
-  const moods = recent.map((h) => h.mood).filter((v): v is number => v !== undefined);
-  const sleeps = recent.map((h) => h.sleepHours).filter((v): v is number => v !== undefined);
-  const avgMood = moods.length ? moods.reduce((a, b) => a + b, 0) / moods.length : null;
-  const avgSleep = sleeps.length ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length : null;
-
-  if (avgMood !== null && avgMood < 3.5) {
-    return {
-      headline: "Mood's dipped a bit recently",
-      tip: "Magnesium-rich foods — leafy greens, nuts, seeds — and steady blood sugar meals can help support mood balance.",
-    };
-  }
-  if (avgSleep !== null && avgSleep < 6.5) {
-    return {
-      headline: "Sleep's been a bit short this week",
-      tip: "Avoiding heavy or spicy dinners, and a calming tea like chamomile in the evening, can support better rest.",
-    };
-  }
-  return {
-    headline: "Mood and sleep have been steady",
-    tip: "Keep this rhythm going — consistency is doing real work here.",
-  };
-}
-
 const skincareWeekMeals: Record<string, { label: string; items: string }[]> = {
   Mon: [
     { label: "Breakfast", items: "Green smoothie, chia seeds, soaked almonds" },
@@ -172,45 +129,6 @@ const skincareWeekMeals: Record<string, { label: string; items: string }[]> = {
     { label: "Dinner", items: "Turmeric baked tofu, brown rice, greens" },
   ],
 };
-
-/**
- * Real, data-driven only — computed from the client's actual logged
- * skinCondition history, not fabricated. Needs at least 2 logged days to
- * say anything; compares the most recent entries against the ones before
- * to detect a real direction rather than guessing.
- */
-function getSkincareSummary(client: { checkinHistory?: ({ skinCondition?: number } | null)[] }) {
-  const logged = (client.checkinHistory ?? [])
-    .filter((h): h is { skinCondition?: number } => h !== null)
-    .map((h) => h.skinCondition)
-    .filter((v): v is number => v !== undefined);
-
-  if (logged.length < 2) return null;
-
-  const recent = logged.slice(-2);
-  const prior = logged.slice(-5, -2);
-  const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
-  const priorAvg = prior.length ? prior.reduce((a, b) => a + b, 0) / prior.length : recentAvg;
-
-  if (recentAvg < priorAvg - 0.3) {
-    return {
-      headline: "Your skin has been improving",
-      tip: "Whatever's been working — keep the no-dairy, low-sugar rhythm going. This week's meals stay anti-inflammatory to support it.",
-    };
-  }
-  if (recentAvg > priorAvg + 0.3) {
-    return {
-      headline: "A rougher stretch recently",
-      tip: "Zinc and omega-3-rich foods (pumpkin seeds, salmon) help calm flare-ups — this week's meals lean into both, and hitting your water goal matters more than usual right now.",
-    };
-  }
-  return {
-    headline: "Skin's been steady",
-    tip: "Consistency is doing the work here — this week's meals keep the same anti-inflammatory, dairy-free approach.",
-  };
-}
-
-type PcosPhaseKey = "menstrual" | "follicular" | "ovulatory" | "luteal";
 
 const pcosPhaseMeals: Record<PcosPhaseKey, Record<string, { label: string; items: string }[]>> = {
   menstrual: {
@@ -362,44 +280,6 @@ const pcosPhaseMeals: Record<PcosPhaseKey, Record<string, { label: string; items
     ],
   },
 };
-
-/**
- * Estimates PCOS cycle phase from real, already-collected data: an active
- * period log takes priority (menstrual), otherwise the client's self-logged
- * cycleDay (from their daily check-in) is used. Returns null if neither is
- * available — meals fall back to the generic set rather than guessing.
- */
-function getPcosPhase(hasActivePeriod: boolean, cycleDay: number | undefined) {
-  if (hasActivePeriod) {
-    return {
-      key: "menstrual" as PcosPhaseKey,
-      phase: "Menstrual phase",
-      tip: "Iron and B12-rich foods help offset what's lost during your period — leafy greens, dal, and lean protein are the focus this week.",
-    };
-  }
-  if (cycleDay !== undefined) {
-    if (cycleDay <= 13) {
-      return {
-        key: "follicular" as PcosPhaseKey,
-        phase: "Follicular phase",
-        tip: "Energy is usually rising through this phase — lighter, fresh meals with plenty of fibre support it well.",
-      };
-    }
-    if (cycleDay === 14) {
-      return {
-        key: "ovulatory" as PcosPhaseKey,
-        phase: "Ovulatory phase",
-        tip: "Antioxidant-rich foods — berries, colourful vegetables — support this phase.",
-      };
-    }
-    return {
-      key: "luteal" as PcosPhaseKey,
-      phase: "Luteal phase",
-      tip: "Cravings and bloating are common here — complex carbs and magnesium-rich foods (nuts, seeds) can help steady mood and digestion.",
-    };
-  }
-  return null;
-}
 
 export default function ClientPlanPage() {
   const [activeDay, setActiveDay] = useState("Mon");

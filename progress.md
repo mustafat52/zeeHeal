@@ -1092,3 +1092,119 @@ app/(client)/progress/page.tsx
 - Hormonal is now feature-complete across Home, Plan, and Progress
 - **Skincare** is the last condition in the queue — same shape of work: identify what's collected but underused on the client's own screens (per `DATA_AUDIT.md`'s method), and add it without touching the other three
 - Two flagged gaps from the audit (`monthlyRecap` and meal `reasoning` authoring) remain open, earmarked for when Zainab's own content-authoring tools get designed
+
+## Session 8 — July 5, 2026 · Skincare deep pass (final condition) + second fake-data fix
+
+### Summary of what was done this session
+Completed the last condition in the queue — Skincare — across Home, Plan, and Progress, closing out the "go condition by condition" work that started several sessions back. Following the pattern that held for Hormonal, the first thing checked was whether `SkincareHome` had the same class of bug found there — it did: the "Skin condition this week" chart was using a hardcoded `[2, 3, 4, 3, 2, ...]` array instead of real data. Fixed the same way, then added the Plan/Progress content for this condition.
+
+---
+
+### `components/client/homes/SkincareHome.tsx` — Updated
+
+**Before:** `recentWeek = [2, 3, 4, 3, 2, skinScore ?? 3, skinScore ?? 3]` — fabricated values for the first 5 days of the chart, with only the last slot or two reflecting anything real. Day labels were hardcoded `["M","T","W","T","F","S","Today"]` regardless of what day of the cycle it actually was.
+
+**After:**
+- Chart now pulls the last (up to) 7 real entries from `checkinHistory`, same approach used for `HormonalHome`'s fix last session
+- Missing days render as the same thin gray "not logged" mark used elsewhere in the app, instead of silently substituting a fake number
+- Day labels changed to real cycle-day numbers (`D1`–`D7` style) rather than calendar weekdays, since `checkinHistory` is cycle-day-indexed, not calendar-indexed
+
+**Why:** Same rationale as the Hormonal fix — a condition's headline chart faking its own data undermines the whole point of building real tracking elsewhere in the app.
+
+---
+
+### `app/(client)/plan/page.tsx` — Updated
+
+**Added `skincareWeekMeals`** — a real, distinct 7-day set (dairy-free, zinc/omega-3/antioxidant-forward: green smoothies, quinoa-avocado bowls, grilled salmon, turmeric lentil soup) rather than the generic khichdi/paneer week. This one was well-grounded rather than invented from scratch — Riya's actual `todayPlan.meals` and `monthlyRecap` ("no dairy, no refined sugar... the no-dairy rule is the most important one right now") already established this exact dietary direction; the weekly set just extends it consistently.
+
+**Added `getSkincareSummary()`** — computes a real trend from logged `skinCondition` history (recent entries vs. the ones before them), not fabricated. Three branches: improving, worsening, or steady — each with a matching, condition-appropriate tip. Falls back to a "log a few check-ins" prompt below 2 logged data points.
+
+---
+
+### `app/(client)/progress/page.tsx` — Updated
+
+Added a "Skin & hydration this cycle" card for skincare clients — two `ActivityBarStrip` charts (Skin condition, Water), both sourced from `checkinHistory` that already powers Zainab's Cycle Report. Same established pattern: data collected for the nutritionist's side, now also shown to the client themselves.
+
+---
+
+### Known limitation carried forward
+`getSkincareSummary`'s "worsening" branch (same as Hormonal's mood-dip branch last session) couldn't be exercised against a live client — Riya's real seeded data only ever trends toward improving. The logic is written and the math holds on paper, but hasn't been confirmed rendering correctly in the actual UI. Worth a deliberate test with adjusted seed data before trusting it fully.
+
+---
+
+### Git details
+*(not yet provided — paste your commit/push terminal output when you have it and I'll add this section, same as every other session)*
+
+---
+
+### What's next
+All 4 conditions (PCOS, weight-loss, hormonal, skincare) are now feature-complete across Home, Plan, and Progress. Two items remain open from `DATA_AUDIT.md`, flagged but not built:
+1. `monthlyRecap` — no authoring UI anywhere for Zainab to write/edit it
+2. Per-meal `reasoning` text — same shape of gap
+
+## Planning Session — Zainab's side: connectivity audit + client management roadmap
+
+> **No code changed in this entry — this is a plan, not a build.** Structured this way so it lives alongside every other decision in this file, and so we can pick items off it deliberately rather than build blind.
+
+### Why this session exists
+Four conditions' worth of client-side features have been built (PCOS, weight-loss, hormonal, skincare — Home/Plan/Progress each). Most of the *data* those features generate already reaches Zainab, thanks to the `checkinCharts.ts` config-driven fix from Session 7. But data reaching her isn't the same as the *conclusions* reaching her — several client screens now tell the client something ("your mood's dipped," "skin's improving") that Zainab has to independently re-derive from raw charts, because the app never says it to her directly. This session audits every such gap, plus the more basic client-management functions (create/edit/delete) that haven't been addressed at all yet.
+
+---
+
+### Part 1 — Connectivity audit: does Zainab see what the client sees?
+
+| Client-side feature | Underlying data | Does Zainab see the *raw data*? | Does Zainab see the *conclusion*? |
+|---|---|---|---|
+| PCOS period calendar + flow logging | `periodLogs`, `dailyFlow` | ✅ Cycle Report period card + `PeriodFlowStrip` | ✅ (period count, active flag, length) |
+| PCOS Plan phase banner ("Menstrual phase," nutrition tip) | `periodLogs` active status + `todayCheckin.cycleDay` | ✅ (same underlying fields, shown elsewhere) | ❌ **Gap** — Zainab never sees "this client is currently in her menstrual phase" stated outright; she'd have to infer it from period dates herself |
+| Weight-loss goal progress + activity | `progress[]`, `goalWeight`, `checkinHistory.activityMinutes` | ✅ Cycle Report goal card + Activity chart | ✅ (kg lost, kg to go both shown) |
+| Hormonal mood/sleep trend banner ("dipped," "steady") | `checkinHistory.mood`/`sleepHours` | ✅ Mood/Sleep charts in Cycle Report | ❌ **Gap** — the classification logic (`getHormonalSummary`) exists only in client-side code; Zainab sees the same bars but not the stated verdict |
+| Skincare skin-trend banner ("improving," "worsening") | `checkinHistory.skinCondition` | ✅ Skin condition chart in Cycle Report | ❌ **Gap** — same shape of issue as hormonal; `getSkincareSummary`'s conclusion is client-only |
+| Monthly recap, meal reasoning | `monthlyRecap`, `meal.reasoning` | N/A (she authors these) | ✅ Just closed this session (`client/[id]/notes`) |
+| Session notes | `notes[]` | ✅ | ✅ (add + view both now exist) |
+
+**The pattern in the three ❌ rows:** each condition's Plan-page banner runs a small piece of *interpretation* (phase detection, trend classification) that only exists in client-facing code (`app/(client)/plan/page.tsx`). Zainab gets the ingredients but not the dish. Three ways to close this, in increasing order of effort:
+
+1. **Cheapest:** surface the same classification as a one-line badge on the client detail page or Cycle Report (e.g., "Currently: Menstrual phase" / "Mood trend: dipped recently" / "Skin trend: improving") — just call the same `getPcosPhase`/`getHormonalSummary`/`getSkincareSummary`-style logic from the nutritionist side too, since it's pure computation, not client-only state.
+2. **Better:** extract each into a shared `lib/` function (like `checkinCharts.ts` did for chart fields) so client and nutritionist pages call the exact same logic — right now each summary function is duplicated conceptually per audience if built twice, which risks drifting out of sync the way the old per-condition chart hardcoding did.
+3. **Most complete:** put these summaries directly into the Cycle Report and Plan History (past cycles), so Zainab can also see how a client's phase/trend looked historically, not just live.
+
+Recommend **option 2** as the actual target — same rationale as the chart-fields fix: one function, two consumers, impossible to drift apart.
+
+---
+
+### Part 2 — Client management: create, edit, delete
+
+| Function | Currently exists? | Where |
+|---|---|---|
+| Create a client | ✅ | `NewClientFormModal` → `addClient` |
+| Edit check-in config | ✅ | `ClientProfileFormModal` → `setCheckinConfig` |
+| Edit monthly recap / meal reasoning / add notes | ✅ (just built) | `client/[id]/notes` |
+| **Edit basic profile fields** (name, phone, condition, `planType`, `goalWeight`, `programDurationMonths` after onboarding) | ❌ | No UI found anywhere — a typo in a client's name or a program-length change has no fix path once they're created |
+| **Delete / remove a client** | ❌ | No `deleteClient` action in `store.ts`, no delete button anywhere |
+| **Archive a completed client** (finished their whole program, not actively being seen) | ❌ | `status` is only `"on-track" \| "needs-attention" \| "new"` — no `"completed"` or `"archived"` state, and no transition UI even if one existed |
+| **Automatic status transitions** (e.g. auto-flip to `"needs-attention"` after N missed days) | ❌ | Flagged already in `DATA_AUDIT.md` — `status` is set once at onboarding and never revisited by any store action |
+| Sort/filter client list beyond name search | ❌ | Dashboard only has the search-by-name input; no sort by cycle-status, last-log recency, or attention-needed |
+
+**Proposed additions, roughly in priority order:**
+1. **Edit basic profile** — a form similar to `ClientProfileFormModal` but for identity/plan fields, opened from client detail page
+2. **Delete client** — a `deleteClient(clientId)` store action + a confirm-before-delete UI (this is destructive, so it needs a real "are you sure" step, not a single tap)
+3. **Archive instead of delete, as the primary path** — for a client who finishes their program, "archived" is usually more correct than "deleted" (keeps their history, plan history, notes intact for reference) — recommend building archive first and treating hard-delete as a secondary, rarer action
+4. **Automatic status logic** — compute `"needs-attention"` from real signals (e.g., 3+ consecutive missed `checkinHistory` days, or `lastLog` older than N days) rather than it being a static field that's only ever set once
+
+---
+
+### What's explicitly NOT in this plan
+- Meal-plan assignment/editing (choosing which foods go in a client's plan) — still deliberately deferred, per every prior session's scope note
+- Push notifications, real auth, backend — README Phase 4, unrelated to this audit
+- Inbox and Chat pages — not reviewed in any session so far; unknown whether they have their own connectivity gaps
+
+---
+
+### Decision needed before building
+This is a big list. Suggest tackling in this order unless you'd rather resequence:
+1. Shared summary functions (closes the 3 ❌ rows in Part 1) — smallest, highest-value fix, mirrors the Session 7 pattern exactly
+2. Edit-basic-profile form
+3. Archive client (+ status filter on dashboard to hide archived by default)
+4. Delete client (as the harder-to-reach, confirm-gated action)
+5. Automatic status transitions (needs the most judgment calls — what counts as "needs attention"? — worth a quick discussion, not just a build)
