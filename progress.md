@@ -1208,3 +1208,200 @@ This is a big list. Suggest tackling in this order unless you'd rather resequenc
 3. Archive client (+ status filter on dashboard to hide archived by default)
 4. Delete client (as the harder-to-reach, confirm-gated action)
 5. Automatic status transitions (needs the most judgment calls — what counts as "needs attention"? — worth a quick discussion, not just a build)
+
+## Session 9 — July 5, 2026 · Zainab's-side plan, item #1: shared condition summaries
+
+### Summary of what was done this session
+First item off the "Zainab's side" roadmap from the planning entry: the three condition-summary functions that only existed client-side (PCOS phase detection, hormonal mood/sleep trend, skincare skin trend) were extracted into a shared lib and are now consumed identically by both the client's Plan page and Zainab's Cycle Report — closing the gap where the client got a stated conclusion ("mood's dipped") that Zainab had to re-derive herself from raw charts.
+
+---
+
+### `lib/conditionSummaries.ts` — New file
+
+Contains `getPcosPhase`, `getWeightLossSummary`, `getHormonalSummary`, and `getSkincareSummary` — moved out of `app/(client)/plan/page.tsx` verbatim, with minor tip-text rewording where the original phrasing referenced "this week's meals" (only meaningful in the Plan page's context, not Zainab's Cycle Report). Logic and thresholds unchanged.
+
+**Why:** Same rationale as the `checkinCharts.ts` fix in Session 7 — one function, two consumers, can't drift apart the way two independently-written copies eventually would.
+
+---
+
+### `app/(client)/plan/page.tsx` — Updated
+
+Removed all four local function definitions and the local `PcosPhaseKey` type; now imports all of them from `lib/conditionSummaries.ts`. Meal-content data (`weekMeals`, `pcosPhaseMeals`, `weightLossWeekMeals`, `skincareWeekMeals`) stayed local, since that's Plan-page-specific content, not shared interpretation logic.
+
+---
+
+### `components/nutritionist/CycleReportModal.tsx` — Updated
+
+Added a new "At a glance" card, positioned right after `PatientProfileCard`: computes the same condition summary via the shared functions and displays the identical headline/tip the client saw on their own Plan page, explicitly labeled "same as what {name} sees on their Plan page" so Zainab knows it's not a separate, possibly-conflicting interpretation.
+
+---
+
+### Git details
+
+import { create } from "zustand";
+import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog, FlowIntensity, CycleSnapshot } from "./mock-data/clients";
+import { clients } from "@/lib/mock-data/clients";
+
+export type ViewMode = "client" | "nutritionpastedI notice the user prompt is empty, so I cannot determine the primary language. However, based on the thinking block being in English, here is my summary:
+
+Diagnosed file placement error and orchestrated structural reorganizationI notice the user prompt is empty, so I cannot determine the primary language. However, based on the thinking block being in English, here is my summary:
+
+Diagnosed file placement error and orchestrated structural reorganizationFound it — that pasted content is store.ts's code (with one extra bad import line, import { clients } from "@/lib/mock-data/clients";, that shouldn't be there at all) sitting inside client/[id]/notes/page.tsx. That confirms the mixup: the two files got swapped or merged when copying from the download folder.
+Fix: client/[id]/notes/page.tsx needs the actual notes-page content, not this. Let me give you both files again, clearly separated, so there's no ambiguity this time.Confirm the two source files are actually distinct before re-sendingConfirm the two source files are actually distinct before re-sendingGood — my source files are correct and distinct; the mixup happened on your end during download/copy. Re-sending both, clearly labeled:Ran a command, read a fileRan a command, read a fileTwo files, two very different destinations — please double-check the destination path this time, since that's exactly where the mixup happened:
+File starts with...Goes toimport { create } from "zustand";store → overwrites lib/store.ts"use client"; then import { useState } from "react";notes-page(...) → replace the entire contents of app/(nutritionist)/client/[id]/notes/page.tsx
+Before saving, open the notes-page file in your editor and confirm the very first line is "use client"; — not import { create } from "zustand";. If it's the latter, you're still looking at the wrong content and need to re-download.
+Once both are in place, delete that stray line if it somehow ended up in your real store.ts too: import { clients } from "@/lib/mock-data/clients"; — that import doesn't belong there at all (it's not in my source), so if you spot it anywhere, it's leftover from the mixup and safe to remove.StoreTS Notes page(for client id notes folder)Code · TSX D:\zeeheal-app\zeeheal-app>git add .
+warning: in the working copy of 'app/(nutritionist)/client/[id]/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/store.ts', LF will be replaced by CRLF the next time Git touches it
+D:\zeeheal-app\zeeheal-app>git commit -m "added notes"
+[main 582a23e] added notes
+ 3 files changed, 192 insertions(+), 1 deletion(-)
+ create mode 100644 app/(nutritionist)/client/[id]/notes/page.tsx
+D:\zeeheal-app\zeeheal-app>git push origin main
+Enumerating objects: 19, done.
+Counting objects: 100% (19/19), done.
+Delta compression using up to 12 threads
+Compressing objects: 100% (9/9), done.
+Writing objects: 100% (11/11), 2.89 KiB | 987.00 KiB/s, done.
+Total 11 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (6/6), completed with 6 local objects.
+To https://github.com/mustafat52/zeeHeal.git
+   86c1cca..582a23e  main -> main
+D:\zeeheal-app\zeeheal-app>now lets plan the zainab's side in detail , every thing we made on client side should connect smoothly to zainab's side, aprt from that other thngs like client creation, deleteion etc ,plan in depth in chanelog itselfShow moreArchitected comprehensive backend audit mapping client features to Zainab's systemsArchitected comprehensive backend audit mapping client features to Zainab's systemsGood moment for this — let me actually audit connectivity systematically (not just assume) before writing the plan, then capture it as a proper changelog entry since that's where the project's decisions live.Orchestrated comprehensive changelog planning for Zainab's integration architectureOrchestrated comprehensive changelog planning for Zainab's integration architecturemarkdown## Planning Session — Zainab's side: connectivity audit + client management roadmap
+
+> **No code changed in this entry — this is a plan, not a build.** Structured this way so it lives alongside every other decision in this file, and so we can pick items off it deliberately rather than build blind.
+
+### Why this session exists
+Four conditions' worth of client-side features have been built (PCOS, weight-loss, hormonal, skincare — Home/Plan/Progress each). Most of the *data* those features generate already reaches Zainab, thanks to the `checkinCharts.ts` config-driven fix from Session 7. But data reaching her isn't the same as the *conclusions* reaching her — several client screens now tell the client something ("your mood's dipped," "skin's improving") that Zainab has to independently re-derive from raw charts, because the app never says it to her directly. This session audits every such gap, plus the more basic client-management functions (create/edit/delete) that haven't been addressed at all yet.
+
+---
+
+### Part 1 — Connectivity audit: does Zainab see what the client sees?
+
+| Client-side feature | Underlying data | Does Zainab see the *raw data*? | Does Zainab see the *conclusion*? |
+|---|---|---|---|
+| PCOS period calendar + flow logging | `periodLogs`, `dailyFlow` | ✅ Cycle Report period card + `PeriodFlowStrip` | ✅ (period count, active flag, length) |
+| PCOS Plan phase banner ("Menstrual phase," nutrition tip) | `periodLogs` active status + `todayCheckin.cycleDay` | ✅ (same underlying fields, shown elsewhere) | ❌ **Gap** — Zainab never sees "this client is currently in her menstrual phase" stated outright; she'd have to infer it from period dates herself |
+| Weight-loss goal progress + activity | `progress[]`, `goalWeight`, `checkinHistory.activityMinutes` | ✅ Cycle Report goal card + Activity chart | ✅ (kg lost, kg to go both shown) |
+| Hormonal mood/sleep trend banner ("dipped," "steady") | `checkinHistory.mood`/`sleepHours` | ✅ Mood/Sleep charts in Cycle Report | ❌ **Gap** — the classification logic (`getHormonalSummary`) exists only in client-side code; Zainab sees the same bars but not the stated verdict |
+| Skincare skin-trend banner ("improving," "worsening") | `checkinHistory.skinCondition` | ✅ Skin condition chart in Cycle Report | ❌ **Gap** — same shape of issue as hormonal; `getSkincareSummary`'s conclusion is client-only |
+| Monthly recap, meal reasoning | `monthlyRecap`, `meal.reasoning` | N/A (she authors these) | ✅ Just closed this session (`client/[id]/notes`) |
+| Session notes | `notes[]` | ✅ | ✅ (add + view both now exist) |
+
+**The pattern in the three ❌ rows:** each condition's Plan-page banner runs a small piece of *interpretation* (phase detection, trend classification) that only exists in client-facing code (`app/(client)/plan/page.tsx`). Zainab gets the ingredients but not the dish. Three ways to close this, in increasing order of effort:
+
+1. **Cheapest:** surface the same classification as a one-line badge on the client detail page or Cycle Report (e.g., "Currently: Menstrual phase" / "Mood trend: dipped recently" / "Skin trend: improving") — just call the same `getPcosPhase`/`getHormonalSummary`/`getSkincareSummary`-style logic from the nutritionist side too, since it's pure computation, not client-only state.
+2. **Better:** extract each into a shared `lib/` function (like `checkinCharts.ts` did for chart fields) so client and nutritionist pages call the exact same logic — right now each summary function is duplicated conceptually per audience if built twice, which risks drifting out of sync the way the old per-condition chart hardcoding did.
+3. **Most complete:** put these summaries directly into the Cycle Report and Plan History (past cycles), so Zainab can also see how a client's phase/trend looked historically, not just live.
+
+Recommend **option 2** as the actual target — same rationale as the chart-fields fix: one function, two consumers, impossible to drift apart.
+
+---
+
+### Part 2 — Client management: create, edit, delete
+
+| Function | Currently exists? | Where |
+|---|---|---|
+| Create a client | ✅ | `NewClientFormModal` → `addClient` |
+| Edit check-in config | ✅ | `ClientProfileFormModal` → `setCheckinConfig` |
+| Edit monthly recap / meal reasoning / add notes | ✅ (just built) | `client/[id]/notes` |
+| **Edit basic profile fields** (name, phone, condition, `planType`, `goalWeight`, `programDurationMonths` after onboarding) | ❌ | No UI found anywhere — a typo in a client's name or a program-length change has no fix path once they're created |
+| **Delete / remove a client** | ❌ | No `deleteClient` action in `store.ts`, no delete button anywhere |
+| **Archive a completed client** (finished their whole program, not actively being seen) | ❌ | `status` is only `"on-track" \| "needs-attention" \| "new"` — no `"completed"` or `"archived"` state, and no transition UI even if one existed |
+| **Automatic status transitions** (e.g. auto-flip to `"needs-attention"` after N missed days) | ❌ | Flagged already in `DATA_AUDIT.md` — `status` is set once at onboarding and never revisited by any store action |
+| Sort/filter client list beyond name search | ❌ | Dashboard only has the search-by-name input; no sort by cycle-status, last-log recency, or attention-needed |
+
+**Proposed additions, roughly in priority order:**
+1. **Edit basic profile** — a form similar to `ClientProfileFormModal` but for identity/plan fields, opened from client detail page
+2. **Delete client** — a `deleteClient(clientId)` store action + a confirm-before-delete UI (this is destructive, so it needs a real "are you sure" step, not a single tap)
+3. **Archive instead of delete, as the primary path** — for a client who finishes their program, "archived" is usually more correct than "deleted" (keeps their history, plan history, notes intact for reference) — recommend building archive first and treating hard-delete as a secondary, rarer action
+4. **Automatic status logic** — compute `"needs-attention"` from real signals (e.g., 3+ consecutive missed `checkinHistory` days, or `lastLog` older than N days) rather than it being a static field that's only ever set once
+
+---
+
+### What's explicitly NOT in this plan
+- Meal-plan assignment/editing (choosing which foods go in a client's plan) — still deliberately deferred, per every prior session's scope note
+- Push notifications, real auth, backend — README Phase 4, unrelated to this audit
+- Inbox and Chat pages — not reviewed in any session so far; unknown whether they have their own connectivity gaps
+
+---
+
+### Decision needed before building
+This is a big list. Suggest tackling in this order unless you'd rather resequence:
+1. Shared summary functions (closes the 3 ❌ rows in Part 1) — smallest, highest-value fix, mirrors the Session 7 pattern exactly
+2. Edit-basic-profile form
+3. Archive client (+ status filter on dashboard to hide archived by default)
+4. Delete client (as the harder-to-reach, confirm-gated action)
+5. Automatic status transitions (needs the most judgment calls — what counts as "needs attention"? — worth a quick discussion, not just a build)
+That's the plan captured. Given the size of this, I'd suggest we pick one numbered item at a time rather than build the whole list — want to start with #1 (shared summary functions), since it's the most direct continuation of work already done and the lowest-risk?lets beginThought for 19sThought for 19sStarting with #1 — extracting the three (four, for consistency) condition-summary functions into shared lib/, then surfacing them on Zainab's side in the Cycle Report.Viewed 3 files, ran a commandViewed 3 files, ran a commandGood, I have everything I need. Building the shared lib:Shared condition-summary logic — same functions consumed by both client Plan page and Zainab's Cycle Report, so the interpretation can never drift between audiencesShared condition-summary logic — same functions consumed by both client Plan page and Zainab's Cycle Report, so the interpretation can never drift between audiencesNow stripping the duplicated logic out of plan-page.tsx and importing from the shared lib:Import shared summary functions instead of defining locallyImport shared summary functions instead of defining locallyNow removing the four local function definitions and the local PcosPhaseKey type (keeping the meal-content data, which stays local):Edited 3 files, viewed 2 files, ran a commandEdited 3 files, viewed 2 files, ran a commandAll four local functions successfully removed, one export remains, balanced. Now surfacing the same conclusions on Zainab's side — CycleReportModal.tsx:Edited 2 files, viewed a fileEdited 2 files, viewed a fileNow the render — an "At a glance" card right after PatientProfileCard:Edited a file, ran a commandEdited a file, ran a commandBoth files balanced. Copying to outputs:Ran a command, read a fileRan a command, read a fileFile targets:
+DownloadGoes toconditionSummaries.tsnew file: lib/conditionSummaries.tsplan-page.tsxoverwrites app/(client)/plan/page.tsxCycleReportModal.tsxoverwrites components/nutritionist/CycleReportModal.tsx
+What changed: the four condition-summary functions (PCOS phase, weight-loss goal math, hormonal mood/sleep trend, skincare skin trend) moved out of the client Plan page into lib/conditionSummaries.ts. Both the client's Plan page and Zainab's Cycle Report now call the same functions — closing the three ❌ gaps from the planning entry.
+Check with:
+
+/client/priya (hormonal, real data trends steady) → Cycle Report → below Patient Profile, a new muted "At a glance — same as what Priya sees on their Plan page" card should read "Mood and sleep have been steady" with the tip text.
+/client/ananya (PCOS, active period) → her card should show "Menstrual phase" with the iron/B12 tip — identical wording to what's on her own /plan page banner.
+/client/riya (skincare, real data improving 6→3) → "Skin has been improving".
+/client/fatima (weight-loss) → since she's brand new, should read "Just getting started" (no "kg lost" since lost is 0).
+
+Worth cross-checking directly: open Ananya's /plan page as the client, note the exact phase text and tip, then immediately compare against her Cycle Report's "At a glance" card as Zainab. They should be word-for-word identical — that's the whole point of the fix, and the fastest way to confirm the shared function is actually being called from both places rather than two copies that happen to currently agree.
+Ready for #2 (edit-basic-profile form) whenever you want to continue down the list.ConditionsummariesTS Plan pageCode · TSX CyclereportmodalCode · TSX D:\zeeheal-app\zeeheal-app>git add .
+warning: in the working copy of 'app/(client)/plan/page.tsx', LF will be replaced by CRLF the next time Git touches it
+D:\zeeheal-app\zeeheal-app>git commit -m "startwd with zainb side step 1"
+[main 1848b74] startwd with zainb side step 1
+ 4 files changed, 331 insertions(+), 128 deletions(-)
+ create mode 100644 lib/conditionSummaries.ts
+D:\zeeheal-app\zeeheal-app>git push origin main
+Enumerating objects: 22, done.
+Counting objects: 100% (22/22), done.
+Delta compression using up to 12 threads
+Compressing objects: 100% (11/11), done.
+Writing objects: 100% (12/12), 7.67 KiB | 981.00 KiB/s, done.
+Total 12 (delta 9), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (9/9), completed with 8 local objects.
+To https://github.com/mustafat52/zeeHeal.git
+   582a23e..1848b74  main -> main
+D:\zeeheal-app\zeeheal-app>just give the logsShow morePrepared to format changelog entry consistentlyPrepared to format changelog entry consistentlymarkdown## Session 9 — July 5, 2026 · Zainab's-side plan, item #1: shared condition summaries
+
+### Summary of what was done this session
+First item off the "Zainab's side" roadmap from the planning entry: the three condition-summary functions that only existed client-side (PCOS phase detection, hormonal mood/sleep trend, skincare skin trend) were extracted into a shared lib and are now consumed identically by both the client's Plan page and Zainab's Cycle Report — closing the gap where the client got a stated conclusion ("mood's dipped") that Zainab had to re-derive herself from raw charts.
+
+---
+
+### `lib/conditionSummaries.ts` — New file
+
+Contains `getPcosPhase`, `getWeightLossSummary`, `getHormonalSummary`, and `getSkincareSummary` — moved out of `app/(client)/plan/page.tsx` verbatim, with minor tip-text rewording where the original phrasing referenced "this week's meals" (only meaningful in the Plan page's context, not Zainab's Cycle Report). Logic and thresholds unchanged.
+
+**Why:** Same rationale as the `checkinCharts.ts` fix in Session 7 — one function, two consumers, can't drift apart the way two independently-written copies eventually would.
+
+---
+
+### `app/(client)/plan/page.tsx` — Updated
+
+Removed all four local function definitions and the local `PcosPhaseKey` type; now imports all of them from `lib/conditionSummaries.ts`. Meal-content data (`weekMeals`, `pcosPhaseMeals`, `weightLossWeekMeals`, `skincareWeekMeals`) stayed local, since that's Plan-page-specific content, not shared interpretation logic.
+
+---
+
+### `components/nutritionist/CycleReportModal.tsx` — Updated
+
+Added a new "At a glance" card, positioned right after `PatientProfileCard`: computes the same condition summary via the shared functions and displays the identical headline/tip the client saw on their own Plan page, explicitly labeled "same as what {name} sees on their Plan page" so Zainab knows it's not a separate, possibly-conflicting interpretation.
+
+---
+
+### Git details
+Commit:   1848b74
+Message:  "startwd with zainb side step 1"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 4
+Insertions:    +331
+Deletions:     -128
+New files created:
+lib/conditionSummaries.ts
+Modified files:
+app/(client)/plan/page.tsx
+components/nutritionist/CycleReportModal.tsx
+
+---
+
+### What's next
+Per the planning entry's priority order — next up is **#2: edit-basic-profile form**, letting Zainab correct/update a client's name, phone, condition, `planType`, `goalWeight`, and `programDurationMonths` after onboarding (currently only `checkinConfig` is editable post-creation).

@@ -101,6 +101,8 @@ export interface Client {
   startDate: string;
   streak: number;
   status: "on-track" | "needs-attention" | "new";
+  /** Explicit manual state — orthogonal to the derived on-track/needs-attention status above. */
+  archived?: boolean;
   lastLog: string;
   planCycle: PlanCycle;
   /** How many months the client signed up for with Zainab (approx 30-day months). Optional until set during onboarding. */

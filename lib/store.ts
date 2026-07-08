@@ -24,6 +24,13 @@ interface AppState {
   setMonthlyRecap: (clientId: string, text: string) => void;
   setMealReasoning: (clientId: string, mealId: string, reasoning: string) => void;
   addSessionNote: (clientId: string, text: string) => void;
+  updateClientProfile: (
+    clientId: string,
+    updates: Partial<Pick<Client, "name" | "initials" | "phone" | "condition" | "planType" | "goalWeight" | "programDurationMonths">>
+  ) => void;
+  archiveClient: (clientId: string) => void;
+  unarchiveClient: (clientId: string) => void;
+  deleteClient: (clientId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -212,5 +219,31 @@ export const useAppStore = create<AppState>((set) => ({
         if (c.id !== clientId) return c;
         return { ...c, notes: [{ date: "Today", text }, ...c.notes] };
       }),
+    })),
+
+  updateClientProfile: (clientId, updates) =>
+    set((state) => ({
+      clients: state.clients.map((c) =>
+        c.id === clientId ? { ...c, ...updates } : c
+      ),
+    })),
+
+  archiveClient: (clientId) =>
+    set((state) => ({
+      clients: state.clients.map((c) =>
+        c.id === clientId ? { ...c, archived: true } : c
+      ),
+    })),
+
+  unarchiveClient: (clientId) =>
+    set((state) => ({
+      clients: state.clients.map((c) =>
+        c.id === clientId ? { ...c, archived: false } : c
+      ),
+    })),
+
+  deleteClient: (clientId) =>
+    set((state) => ({
+      clients: state.clients.filter((c) => c.id !== clientId),
     })),
 }));

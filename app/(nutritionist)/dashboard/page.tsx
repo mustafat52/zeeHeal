@@ -9,13 +9,15 @@ import { DigestCard } from "@/components/nutritionist/DigestCard";
 import { NewClientFormModal } from "@/components/nutritionist/NewClientFormModal";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { generateDigest } from "@/lib/digest";
+import { getDisplayStatus } from "@/lib/clientStatus";
 import { AnimatePresence } from "framer-motion";
-import { AlertCircle, ChevronRight, Search, Plus, RefreshCw } from "lucide-react";
+import { AlertCircle, ChevronRight, Search, Plus, RefreshCw, Archive } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   "on-track": "On track",
   "needs-attention": "Needs attention",
   new: "New client",
+  archived: "Archived",
 };
 
 export default function NutritionistDashboardPage() {
@@ -23,14 +25,19 @@ export default function NutritionistDashboardPage() {
   const addClient = useAppStore((s) => s.addClient);
   const [query, setQuery] = useState("");
   const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
-  const needsAttention = clients.filter((c) => c.status === "needs-attention").length;
-  const cycleReviewDue = clients.filter(
+  const activeClients = clients.filter((c) => !c.archived);
+  const archivedClients = clients.filter((c) => c.archived);
+
+  const needsAttention = activeClients.filter((c) => getDisplayStatus(c) === "needs-attention").length;
+  const cycleReviewDue = activeClients.filter(
     (c) => c.planCycle.totalDays - c.planCycle.currentDay <= 3
   ).length;
-  const digestItems = generateDigest(clients);
+  const digestItems = generateDigest(activeClients);
 
-  const filteredClients = clients.filter((c) =>
+  const listSource = showArchived ? archivedClients : activeClients;
+  const filteredClients = listSource.filter((c) =>
     c.name.toLowerCase().includes(query.toLowerCase())
   );
 
@@ -48,7 +55,7 @@ export default function NutritionistDashboardPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white/70 rounded-xl p-3.5">
             <p className="text-xs text-moss-600">Active clients</p>
-            <p className="font-display text-2xl text-moss-900 mt-1">{clients.length}</p>
+            <p className="font-display text-2xl text-moss-900 mt-1">{activeClients.length}</p>
           </div>
           <div className="bg-white/70 rounded-xl p-3.5">
             <p className="text-xs text-moss-600">Needs attention</p>
@@ -75,11 +82,13 @@ export default function NutritionistDashboardPage() {
 
       <div className="px-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-moss-600">All clients</h2>
+          <h2 className="text-sm font-medium text-moss-600">
+            {showArchived ? "Archived clients" : "All clients"}
+          </h2>
           <span className="text-xs text-moss-400">{filteredClients.length} total</span>
         </div>
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-2.5">
           <div className="relative flex-1">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-moss-400" />
             <input
@@ -98,14 +107,25 @@ export default function NutritionistDashboardPage() {
           </button>
         </div>
 
+        {archivedClients.length > 0 && (
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="tap-scale flex items-center gap-1.5 text-xs text-moss-500 mb-4"
+          >
+            <Archive size={12} />
+            {showArchived ? "Back to active clients" : `Show archived (${archivedClients.length})`}
+          </button>
+        )}
+
         <div className="flex flex-col gap-2.5">
           {filteredClients.map((client) => {
             const daysLeft = client.planCycle.totalDays - client.planCycle.currentDay;
             const nearEnd = daysLeft <= 3;
+            const displayStatus = getDisplayStatus(client);
 
             return (
               <Link key={client.id} href={`/client/${client.id}`}>
-                <Card className="flex items-center gap-3">
+                <Card className={`flex items-center gap-3 ${client.archived ? "opacity-60" : ""}`}>
                   <div className="w-11 h-11 rounded-full bg-sage-100 flex items-center justify-center font-medium text-sage-800 shrink-0">
                     {client.initials}
                   </div>
@@ -114,25 +134,27 @@ export default function NutritionistDashboardPage() {
                     <p className="text-xs text-moss-400 truncate">{client.planType}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    {client.status === "needs-attention" ? (
+                    {displayStatus === "needs-attention" ? (
                       <span className="flex items-center gap-1 text-xs text-clay-600 font-medium">
-                        <AlertCircle size={12} /> {statusLabel[client.status]}
+                        <AlertCircle size={12} /> {statusLabel[displayStatus]}
                       </span>
                     ) : (
-                      <Pill tone={client.status === "new" ? "neutral" : "sage"}>
-                        {statusLabel[client.status]}
+                      <Pill tone={displayStatus === "new" || displayStatus === "archived" ? "neutral" : "sage"}>
+                        {statusLabel[displayStatus]}
                       </Pill>
                     )}
                     <span className="text-[11px] text-moss-400">{client.lastLog}</span>
-                    <span
-                      className={
-                        nearEnd
-                          ? "text-[10px] font-medium text-clay-600 bg-clay-100 px-2 py-0.5 rounded-full"
-                          : "text-[10px] text-moss-400"
-                      }
-                    >
-                      Day {client.planCycle.currentDay}/15{nearEnd ? " · Review due" : ""}
-                    </span>
+                    {!client.archived && (
+                      <span
+                        className={
+                          nearEnd
+                            ? "text-[10px] font-medium text-clay-600 bg-clay-100 px-2 py-0.5 rounded-full"
+                            : "text-[10px] text-moss-400"
+                        }
+                      >
+                        Day {client.planCycle.currentDay}/15{nearEnd ? " · Review due" : ""}
+                      </span>
+                    )}
                   </div>
                   <ChevronRight size={16} className="text-moss-400 shrink-0" />
                 </Card>
@@ -141,7 +163,9 @@ export default function NutritionistDashboardPage() {
           })}
 
           {filteredClients.length === 0 && (
-            <p className="text-sm text-moss-400 text-center py-8">No clients match &quot;{query}&quot;</p>
+            <p className="text-sm text-moss-400 text-center py-8">
+              {showArchived ? "No archived clients." : `No clients match "${query}"`}
+            </p>
           )}
         </div>
       </div>
