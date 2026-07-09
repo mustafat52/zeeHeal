@@ -1,3 +1,5 @@
+import { ConditionType } from "./clients";
+
 export interface WeekMeal {
   label: string;
   items: string;
@@ -10,6 +12,7 @@ export interface PlanTemplate {
   name: string;
   tag: string;
   description: string;
+  condition: ConditionType;
   weeklyMeals: WeeklyMeals;
 }
 
@@ -19,6 +22,7 @@ export const planTemplates: PlanTemplate[] = [
     name: "Gut health reset",
     tag: "4 weeks",
     description: "Anti-inflammatory, dairy-free, fibre-rich meals to calm bloating and improve digestion.",
+    condition: "hormonal",
     weeklyMeals: {
       Mon: [
         { label: "Breakfast", items: "Moong dal chilla, mint chutney" },
@@ -62,6 +66,7 @@ export const planTemplates: PlanTemplate[] = [
     name: "PCOS / hormone balance",
     tag: "8 weeks",
     description: "Low-GI, seed-cycling based plan to support insulin sensitivity and hormone regulation.",
+    condition: "pcos",
     weeklyMeals: {
       Mon: [
         { label: "Breakfast", items: "Flaxseed oats, berries" },
@@ -105,6 +110,7 @@ export const planTemplates: PlanTemplate[] = [
     name: "Sustainable weight loss",
     tag: "6 weeks",
     description: "Calorie-aware, high-protein meals built around foods the client already eats.",
+    condition: "weight-loss",
     weeklyMeals: {
       Mon: [
         { label: "Breakfast", items: "Vegetable oats, boiled egg" },
@@ -148,6 +154,7 @@ export const planTemplates: PlanTemplate[] = [
     name: "Skin and gut reset",
     tag: "4 weeks",
     description: "Targets acne and dull skin through gut-skin axis support and reduced sugar load.",
+    condition: "skincare",
     weeklyMeals: {
       Mon: [
         { label: "Breakfast", items: "Green smoothie, chia seeds, soaked almonds" },

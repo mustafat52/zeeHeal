@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Client } from "@/lib/mock-data/clients";
 import { PlanTemplate } from "@/lib/mock-data/plans";
-import { X, ChevronRight } from "lucide-react";
+import { X, ChevronRight, AlertTriangle } from "lucide-react";
 
 export function AssignPlanModal({
   template,
@@ -42,28 +42,36 @@ export function AssignPlanModal({
         </p>
 
         <div className="flex flex-col gap-2">
-          {clients.map((client) => (
-            <button
-              key={client.id}
-              onClick={() => onAssign(client.id)}
-              className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 rounded-xl p-3"
-            >
-              <div className="w-9 h-9 rounded-full bg-sage-100 flex items-center justify-center font-medium text-sage-800 text-sm shrink-0">
-                {client.initials}
-              </div>
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-medium text-moss-900">{client.name}</p>
-                <p className="text-xs text-moss-400 truncate">
-                  {client.weeklyPlan?.templateId === template.id
-                    ? "Already on this plan — reassigning will overwrite their edits"
-                    : client.weeklyPlan
-                    ? `Currently on: ${client.weeklyPlan.templateName ?? "a custom plan"}`
-                    : "No plan assigned yet"}
-                </p>
-              </div>
-              <ChevronRight size={16} className="text-moss-400 shrink-0" />
-            </button>
-          ))}
+          {clients.map((client) => {
+            const mismatch = client.condition !== template.condition;
+            return (
+              <button
+                key={client.id}
+                onClick={() => onAssign(client.id)}
+                className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 rounded-xl p-3"
+              >
+                <div className="w-9 h-9 rounded-full bg-sage-100 flex items-center justify-center font-medium text-sage-800 text-sm shrink-0">
+                  {client.initials}
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-sm font-medium text-moss-900">{client.name}</p>
+                  {mismatch && (
+                    <p className="text-[11px] text-clay-600 flex items-center gap-1 mt-0.5">
+                      <AlertTriangle size={10} /> Template is for {template.condition} · client is {client.condition}
+                    </p>
+                  )}
+                  <p className="text-xs text-moss-400 truncate">
+                    {client.weeklyPlan?.templateId === template.id
+                      ? "Already on this plan — reassigning will overwrite their edits"
+                      : client.weeklyPlan
+                      ? `Currently on: ${client.weeklyPlan.templateName ?? "a custom plan"}`
+                      : "No plan assigned yet"}
+                  </p>
+                </div>
+                <ChevronRight size={16} className="text-moss-400 shrink-0" />
+              </button>
+            );
+          })}
           {clients.length === 0 && (
             <p className="text-sm text-moss-400 text-center py-6">No clients yet.</p>
           )}

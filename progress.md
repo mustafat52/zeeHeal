@@ -1487,3 +1487,135 @@ app/(nutritionist)/client/[id]/page.tsx
 ### What's next
 Zainab's side is now at parity with the 4 condition pages. Per the prior conversation, next is backend implementation — starting from the decisions in `BACKEND_PLAN.md` §8 (auth question already resolved: no OTP, magic link or equivalent, permanently — not just deferred).
 
+## Session 11 — July 9, 2026 · Chat/inbox/digest fixes + full plan assignment system
+
+### Summary of what was done this session
+Two bodies of work landed together in the final commit before wrapping this conversation. First, a completeness audit surfaced that chat was never actually wired to shared state — both chat pages used local `useState` seeded once from static mock data, meaning the client and nutritionist never saw each other's messages despite the UI looking fully interactive. Second, and larger: a full plan-assignment system was built to replace the four generic, condition-wide meal sets with real, independently editable per-client weekly plans — directly addressing Zainab's actual workflow (a general template per condition, individually tweaked per client for allergies/affordability).
+
+---
+
+### `lib/store.ts` — Updated (two rounds)
+
+**Round 1 — chat/messages:**
+- Added `messagesByClient: Record<string, Message[]>` as shared global state, initialized from the existing `chatThreads` seed at store creation
+- Added `sendMessage(clientId, sender, content)` — the one place either side appends a message
+
+**Before:** Both `app/(client)/chat/page.tsx` and `client/[id]/chat/page.tsx` held messages in local component state, each seeded independently from the same static `chatThreads` import. A message sent by the client was appended only to the client's own local copy — Zainab's chat page, reading its own separate local copy, never saw it, and vice versa. Nothing persisted across navigation either.
+
+**Round 2 — plan assignment:**
+- Added `assignPlanToClient(clientId, template)` — forks a template's `weeklyMeals` into the client's own `weeklyPlan.days` via a deep clone (`JSON.parse(JSON.stringify(...))`), explicitly never sharing object references with the template
+- **PCOS smart-fill:** when assigning the PCOS template specifically, checks the client's current cycle phase (reusing `getPcosPhase` from `lib/conditionSummaries.ts`) and forks from the matching phase-set in `pcosPhaseStarterMeals` instead of the generic template content — a better-informed starting point, but a one-time fork, not an ongoing link
+- Added `setClientWeeklyPlan(clientId, days)` — commits edits to an already-assigned (or from-scratch) plan
+
+**Why the PCOS auto-swap was retired:** the app previously had automatic phase-based meal-swapping that silently changed a PCOS client's meals as her cycle phase changed. Once real per-client editing exists, that would actively fight against manual edits — Zainab removing an allergen could get silently overwritten by the next automatic phase change. Smart-fill at assignment time preserves the value of that phase-awareness work without the conflict.
+
+---
+
+### `lib/mock-data/plans.ts` — Updated
+
+**Before:** `PlanTemplate` had no meal content at all — just `id`, `name`, `tag`, `description`, `usedBy` (a static, never-updated number). "Assign to client" and the usage count were both decorative; per the original README, this page was explicitly "display only, no assignment yet."
+
+**After:**
+- Added `weeklyMeals: WeeklyMeals` (full Mon–Sun × 3-meal content) to all 4 templates — Gut health reset reuses the app's original generic week; PCOS/hormone balance is a new low-GI, seed-cycling-inspired week; Sustainable weight loss and Skin and gut reset reuse the real condition-specific content already built in earlier sessions (`weightLossWeekMeals`, `skincareWeekMeals`)
+- Added `pcosPhaseStarterMeals` — the four phase-specific meal sets (menstrual/follicular/ovulatory/luteal) originally built for PCOS's automatic swapping, relocated here to power the smart-fill described above instead of being retired outright
+- Removed the static `usedBy` field entirely — usage is now computed live from actual client assignments (see Plan Builder below), so it can never drift out of sync with reality the way a hand-maintained counter would
+
+---
+
+### `lib/mock-data/clients.ts` — Updated
+
+Added `weeklyPlan?: { templateId?, templateName?, days }` to `Client` — the client's own real, editable weekly plan. Explicitly documented as NOT a live link: editing a template after assignment never changes any client's copy, and editing a client's plan never changes the template or any other client on it.
+
+---
+
+### `components/nutritionist/AssignPlanModal.tsx` — New file
+
+Bottom-sheet client picker triggered from a template's "Assign to client" button. Each row shows the client's current plan status (on this template already / on a different plan / unassigned) before Zainab taps — including an explicit warning if reassigning would overwrite an already-customized plan. Selecting a client immediately navigates into their plan editor, matching the real workflow (assign a base, then tweak for allergies/affordability) in one motion rather than two separate trips.
+
+---
+
+### `app/(nutritionist)/plan-builder/page.tsx` — Updated
+
+**Before:** Static list, hardcoded `usedBy` numbers, non-functional "Assign to client" button.
+
+**After:**
+- "Used by N clients" is now computed live (`activeClients.filter(c => c.weeklyPlan?.templateId === plan.id)`)
+- Tapping the usage line expands to show the actual client names, each linking to their profile — literal implementation of "see who follows what," not just a count
+- "Assign to client" opens `AssignPlanModal`; a successful assignment routes straight into that client's plan editor
+
+---
+
+### `app/(nutritionist)/client/[id]/plan-editor/page.tsx` — New file
+
+Full-week editor: day picker (Mon–Sun, same interaction pattern as the client-facing Plan page), each meal's `items` text directly editable, one "Save plan" button commits the entire week at once rather than per-meal or per-day saves. Works identically whether the client has an assigned template to build on or nothing yet (falls back to a blank 7×3 scaffold for building from scratch).
+
+---
+
+### `app/(nutritionist)/client/[id]/page.tsx` — Updated
+
+Added a "Weekly meal plan" entry point card (amber-accented, matching the app's existing amber-for-plans association from weight-loss) below the Notes button, showing the client's current plan lineage (`templateName`, or "No plan assigned yet") before Zainab taps in.
+
+---
+
+### `app/(client)/plan/page.tsx` — Updated
+
+**Before:** Meal content was always selected from the four hardcoded generic/phase/condition sets — every client with a given condition saw identical meals forever, regardless of individual allergies, affordability, or preference.
+
+**After:** `client.weeklyPlan?.days` takes priority when present; the old per-condition sets are now a fallback used only for clients nothing has been assigned to yet — so existing seeded clients (none of whom have a `weeklyPlan` set) see no behavior change until Zainab actively assigns something.
+
+**Correctness fix caught during this change:** the PCOS phase banner used to claim "this week's meals below are set for your [phase]" unconditionally. Once a real assigned plan can override that content, the claim would become false the moment Zainab's edits no longer matched the phase-set. That line now only renders when the fallback (not a real assigned plan) is actually what's being shown.
+
+---
+
+### `app/(client)/chat/page.tsx`, `app/(nutritionist)/client/[id]/chat/page.tsx` — Updated
+
+Both rewritten to read/write `messagesByClient` via the store instead of local `useState`. This is a strict fix, not a feature addition — no read receipts, timestamps, or scroll behavior were added, only making the existing UI actually do what it visually claimed to do. As a side effect, this also fixed a stale-closure bug on the client chat page, where switching which client was "active" via the login selector wouldn't update which thread was displayed (local `useState` only evaluates its seed once; the store-backed selector re-reads reactively).
+
+---
+
+### `app/(nutritionist)/inbox/page.tsx` — Updated
+
+Read source changed from the static `chatThreads` import (frozen forever at whatever the seed data said) to the live `messagesByClient` store state, so previews actually reflect the most recent message either side has sent. Also now filters out archived clients, matching the dashboard's behavior since Session 10.
+
+---
+
+### `lib/digest.ts` — Updated
+
+`generateDigest` and `digestSummaryLine` switched from reading the raw, largely-vestigial `client.status` field to calling `getDisplayStatus(client)` — the computed function introduced in Session 10. Before this fix, the dashboard's status pills and the digest feed's "hasn't logged in a few days" language could legitimately disagree about the same client, since one read a live computed value and the other read a field that's only ever set once at onboarding.
+
+---
+
+### Git details
+
+Commit: fb8c00a
+Message: "completing frontend pending works"
+Branch: main
+Remote: https://github.com/mustafat52/zeeHeal.git
+Files changed: 13
+Insertions: +839
+Deletions: -77
+New files created:
+app/(nutritionist)/client/[id]/plan-editor/page.tsx
+components/nutritionist/AssignPlanModal.tsx
+Modified files:
+app/(client)/chat/page.tsx
+app/(client)/plan/page.tsx
+app/(nutritionist)/client/[id]/chat/page.tsx
+app/(nutritionist)/client/[id]/page.tsx
+app/(nutritionist)/inbox/page.tsx
+app/(nutritionist)/plan-builder/page.tsx
+lib/digest.ts
+lib/mock-data/clients.ts
+lib/mock-data/plans.ts
+lib/store.ts
+
+
+---
+
+### What's next
+Four open items carried forward, none blocking for the July 12 beta but worth tracking in whatever conversation picks this up:
+1. "New plan template" button on Plan Builder is still a placeholder — no create-template flow exists yet
+2. Plan editor doesn't show per-day unsaved-change indicators — easy to lose track of what's been edited across days before hitting Save
+3. Neither Plan Builder nor the plan editor filter/suggest templates by the client's actual condition — Zainab could currently assign the skincare template to a PCOS client with no warning
+4. Backend implementation (`BACKEND_PLAN.md`) — not yet started; six decisions from that doc's §8 still need locking before any Supabase/migration work begins
+

@@ -3,17 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { planTemplates, PlanTemplate } from "@/lib/mock-data/plans";
+import { PlanTemplate } from "@/lib/mock-data/plans";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { AssignPlanModal } from "@/components/nutritionist/AssignPlanModal";
 import { AnimatePresence } from "framer-motion";
-import { Plus, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Users, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 
 export default function PlanBuilderPage() {
   const router = useRouter();
   const clients = useAppStore((s) => s.clients);
+  const planTemplates = useAppStore((s) => s.planTemplates);
   const assignPlanToClient = useAppStore((s) => s.assignPlanToClient);
   const activeClients = clients.filter((c) => !c.archived);
 
@@ -34,7 +35,7 @@ export default function PlanBuilderPage() {
       </div>
       <p className="text-sm text-moss-400 mb-5">Reuse a template or build a new one for a client</p>
 
-      <Button variant="primary" className="w-full mb-5">
+      <Button variant="primary" className="w-full mb-5" onClick={() => router.push("/plan-builder/new")}>
         <Plus size={16} /> New plan template
       </Button>
 
@@ -46,7 +47,16 @@ export default function PlanBuilderPage() {
           return (
             <Card key={plan.id}>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="font-medium text-moss-900 text-sm">{plan.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-medium text-moss-900 text-sm">{plan.name}</p>
+                  <button
+                    onClick={() => router.push(`/plan-builder/${plan.id}`)}
+                    className="tap-scale w-6 h-6 rounded-full bg-moss-900/5 flex items-center justify-center shrink-0"
+                    aria-label={`Edit ${plan.name}`}
+                  >
+                    <Pencil size={11} className="text-moss-500" />
+                  </button>
+                </div>
                 <Pill tone="neutral">{plan.tag}</Pill>
               </div>
               <p className="text-xs text-moss-400 leading-relaxed mb-3">{plan.description}</p>

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog, FlowIntensity, CycleSnapshot } from "./mock-data/clients";
 import { chatThreads as initialChatThreads, Message } from "./mock-data/messages";
-import { PlanTemplate, pcosPhaseStarterMeals, WeeklyMeals } from "./mock-data/plans";
+import { PlanTemplate, planTemplates as initialPlanTemplates, pcosPhaseStarterMeals, WeeklyMeals } from "./mock-data/plans";
 import { getPcosPhase } from "./conditionSummaries";
 
 export type ViewMode = "client" | "nutritionist";
@@ -50,6 +50,18 @@ interface AppState {
 
   assignPlanToClient: (clientId: string, template: PlanTemplate) => void;
   setClientWeeklyPlan: (clientId: string, days: WeeklyMeals) => void;
+
+  /**
+   * Moved from a static import to real store state — templates need to be
+   * creatable/editable/deletable at runtime, which a static array can't
+   * support. Client assignments still fork a deep copy at assignment time
+   * (assignPlanToClient), so editing a template here never touches any
+   * client who already has their own copy.
+   */
+  planTemplates: PlanTemplate[];
+  addPlanTemplate: (template: PlanTemplate) => void;
+  updatePlanTemplate: (templateId: string, updates: Partial<PlanTemplate>) => void;
+  deletePlanTemplate: (templateId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -328,5 +340,22 @@ export const useAppStore = create<AppState>((set) => ({
           },
         };
       }),
+    })),
+
+  planTemplates: initialPlanTemplates,
+
+  addPlanTemplate: (template) =>
+    set((state) => ({ planTemplates: [...state.planTemplates, template] })),
+
+  updatePlanTemplate: (templateId, updates) =>
+    set((state) => ({
+      planTemplates: state.planTemplates.map((t) =>
+        t.id === templateId ? { ...t, ...updates } : t
+      ),
+    })),
+
+  deletePlanTemplate: (templateId) =>
+    set((state) => ({
+      planTemplates: state.planTemplates.filter((t) => t.id !== templateId),
     })),
 }));

@@ -26,6 +26,7 @@ export default function ClientPlanEditorPage() {
 
   const [activeDay, setActiveDay] = useState("Mon");
   const [draft, setDraft] = useState(() => client?.weeklyPlan?.days ?? blankWeek());
+  const [dirtyDays, setDirtyDays] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState(false);
 
   if (!client) return null;
@@ -35,10 +36,12 @@ export default function ClientPlanEditorPage() {
       ...prev,
       [day]: prev[day].map((m, i) => (i === index ? { ...m, items } : m)),
     }));
+    setDirtyDays((prev) => new Set(prev).add(day));
   }
 
   function handleSave() {
     setClientWeeklyPlan(client!.id, draft);
+    setDirtyDays(new Set());
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
@@ -63,13 +66,16 @@ export default function ClientPlanEditorPage() {
             key={day}
             onClick={() => setActiveDay(day)}
             className={clsx(
-              "tap-scale shrink-0 px-4 py-2 rounded-full text-sm font-medium border",
+              "tap-scale shrink-0 relative px-4 py-2 rounded-full text-sm font-medium border",
               activeDay === day
                 ? "bg-sage-600 text-white border-sage-600"
                 : "bg-white text-moss-600 border-sage-100"
             )}
           >
             {day}
+            {dirtyDays.has(day) && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 border border-white" />
+            )}
           </button>
         ))}
       </div>
@@ -95,7 +101,9 @@ export default function ClientPlanEditorPage() {
         <Save size={16} /> {saved ? "Saved" : "Save plan"}
       </button>
       <p className="text-[11px] text-moss-400 text-center mt-2">
-        Saving updates all 7 days at once, not just {activeDay}.
+        {dirtyDays.size > 0
+          ? `${dirtyDays.size} day${dirtyDays.size === 1 ? "" : "s"} with unsaved changes — saving updates all 7 days at once`
+          : "Saving updates all 7 days at once"}
       </p>
     </div>
   );
