@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { chatThreads, Message } from "@/lib/mock-data/messages";
 import { VoiceRecorder } from "@/components/client/VoiceRecorder";
 import { VoiceMessageBubble } from "@/components/client/VoiceMessageBubble";
 import { ChevronLeft, Send, Phone } from "lucide-react";
@@ -14,34 +13,21 @@ export default function NutritionistChatPage() {
   const router = useRouter();
   const clientId = params.id as string;
   const client = useAppStore((s) => s.clients.find((c) => c.id === clientId));
-  const initialMessages = chatThreads[clientId] ?? [];
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const messages = useAppStore((s) => s.messagesByClient[clientId] ?? []);
+  const sendMessage = useAppStore((s) => s.sendMessage);
   const [input, setInput] = useState("");
 
   if (!client) return null;
 
   function send() {
     if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: String(Date.now()), sender: "nutritionist", text: input, time: "now" },
-    ]);
+    sendMessage(clientId, "nutritionist", { text: input });
     setInput("");
   }
 
   function sendVoice(audioUrl: string, duration: number) {
     if (!audioUrl) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: String(Date.now()),
-        sender: "nutritionist",
-        text: "",
-        time: "now",
-        audioUrl,
-        audioDuration: duration,
-      },
-    ]);
+    sendMessage(clientId, "nutritionist", { audioUrl, audioDuration: duration });
   }
 
   return (

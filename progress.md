@@ -1405,3 +1405,85 @@ components/nutritionist/CycleReportModal.tsx
 
 ### What's next
 Per the planning entry's priority order — next up is **#2: edit-basic-profile form**, letting Zainab correct/update a client's name, phone, condition, `planType`, `goalWeight`, and `programDurationMonths` after onboarding (currently only `checkinConfig` is editable post-creation).
+
+
+## Session 10 — July 7, 2026 · Zainab's side completion: archive, delete, automatic status
+
+### Summary of what was done this session
+Closed out items #3, #4, and #5 from the earlier "Zainab's side" planning entry — client archiving, gated deletion, and automatic status detection — bringing Zainab's side to parity with the depth already built into the 4 condition pages, ahead of moving to backend work. `status` shifted from a manually-set field to a computed one, following the same "derive, don't duplicate" principle used for `progress_points` in the backend plan.
+
+---
+
+### `lib/clientStatus.ts` — New file
+
+`getDisplayStatus(client)` computes `"on-track" | "needs-attention" | "new" | "archived"` at display time from real signals, rather than reading a stored field that every store action would otherwise need to remember to keep in sync:
+- `archived` short-circuits everything else — it's a genuine manual decision, not a derived behavior pattern
+- `new` applies during a grace period (started within 3 days, 1 or fewer logged check-ins) so a brand-new client isn't immediately flagged as a problem
+- `needs-attention` fires on 2+ **consecutive** missed days at the tail of `checkinHistory` — deliberately not "any gap anywhere in the cycle," so a client who had a rough patch 10 days ago but has since recovered doesn't still read as an active concern today
+
+**Why:** The alternative — updating a stored `status` field from `logCheckin`, `addWater`, `renewPlanCycle`, etc. — is exactly the kind of fragile multi-writer pattern that's caused real bugs earlier in this project (the hardcoded-per-condition chart bug, the HormonalHome/SkincareHome fake data). Computing it fresh every render removes an entire class of "field went stale" risk.
+
+---
+
+### `lib/mock-data/clients.ts` — Updated
+
+Added `archived?: boolean` to `Client` — explicitly separate from the existing `status` field (now effectively superseded by `getDisplayStatus` for display purposes, kept only as an onboarding-time default).
+
+---
+
+### `lib/store.ts` — Updated
+
+Added three actions: `archiveClient`, `unarchiveClient` (both simple flag flips), and `deleteClient` (filters the client out of state entirely — genuinely destructive, no soft-delete).
+
+---
+
+### `components/nutritionist/EditClientInfoModal.tsx` — Updated
+
+Added a "Danger zone" section below the existing save button:
+- **Archive/Restore** — single tap, reversible, explained inline ("history, notes, and plan data stay intact")
+- **Delete** — two-step gate. First tap reveals a red confirm box explaining the distinction from archiving ("Archiving is reversible; this is not") before a second tap actually deletes. No native `confirm()` dialog — kept in the app's own visual language instead.
+
+---
+
+### `app/(nutritionist)/client/[id]/page.tsx` — Updated
+
+- Wired the three new actions from the modal
+- Added a small "Archived" badge next to the client's name on their own detail page, so viewing an archived client directly (e.g., via a stale link) isn't confusing
+- Delete now navigates back to `/dashboard`, since the client record it was displaying no longer exists
+
+---
+
+### `app/(nutritionist)/dashboard/page.tsx` — Updated
+
+- Archived clients are filtered out of the main list, stat cards, digest feed, and cycle-review-due count by default
+- New "Show archived (N)" toggle reveals them in a separate view (faded cards, "Archived" pill, no cycle-day badge since it's not relevant once archived)
+- Status pill/badge now reads from `getDisplayStatus(client)` instead of the static `client.status` field
+
+**Caveat carried into this session:** `generateDigest` is now called with a pre-filtered (non-archived) client array, but I don't have that file's source to confirm it handles a filtered subset the way I'm assuming — worth a direct check if archived clients ever show up in the digest feed unexpectedly.
+
+---
+
+### Git details
+
+Commit:   a1accb9
+Message:  "completing zainabd side"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 7
+Insertions:    +879
+Deletions:     -131
+New files created:
+components/nutritionist/EditClientInfoModal.tsx
+lib/clientStatus.ts
+Modified files:
+lib/mock-data/clients.ts
+lib/store.ts
+app/(nutritionist)/dashboard/page.tsx
+app/(nutritionist)/client/[id]/page.tsx
+(1 additional file per git's count, likely a build artifact such as next-env.d.ts, consistent with prior sessions)
+
+---
+
+### What's next
+Zainab's side is now at parity with the 4 condition pages. Per the prior conversation, next is backend implementation — starting from the decisions in `BACKEND_PLAN.md` §8 (auth question already resolved: no OTP, magic link or equivalent, permanently — not just deferred).
+

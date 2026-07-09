@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
-import { chatThreads } from "@/lib/mock-data/messages";
 import { Card } from "@/components/ui/Card";
 import { Mic, Phone } from "lucide-react";
 
 export default function InboxPage() {
   const clients = useAppStore((s) => s.clients);
+  const messagesByClient = useAppStore((s) => s.messagesByClient);
+
+  const activeClients = clients.filter((c) => !c.archived);
 
   return (
     <div>
@@ -20,8 +22,8 @@ export default function InboxPage() {
 
       <div className="px-5 -mt-3">
         <div className="flex flex-col gap-2.5">
-          {clients.map((client) => {
-            const thread = chatThreads[client.id] ?? [];
+          {activeClients.map((client) => {
+            const thread = messagesByClient[client.id] ?? [];
             const lastMessage = thread[thread.length - 1];
             const isVoice = lastMessage?.audioDuration !== undefined;
             const preview = lastMessage ? (isVoice ? "Voice note" : lastMessage.text) : "No messages yet";

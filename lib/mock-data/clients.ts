@@ -114,6 +114,17 @@ export interface Client {
    * Resets to all-null when a new cycle starts via renewPlanCycle.
    */
   checkinHistory?: (DailyCheckin | null)[];
+  /**
+   * The client's own real, editable weekly meal plan — forked from a
+   * template at assignment time, then independently edited. Not a live
+   * link back to the template: editing the template later never changes
+   * this, and editing this never changes the template or any other client.
+   */
+  weeklyPlan?: {
+    templateId?: string;
+    templateName?: string;
+    days: Record<string, { label: string; items: string }[]>;
+  };
   /** Archived record of every completed cycle, oldest first. */
   cycleHistory?: CycleSnapshot[];
   goalWeight?: number;

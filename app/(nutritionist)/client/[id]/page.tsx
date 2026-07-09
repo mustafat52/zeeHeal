@@ -10,9 +10,10 @@ import { PrepSheetModal } from "@/components/nutritionist/PrepSheetModal";
 import { ClientProfileFormModal } from "@/components/nutritionist/ClientProfileFormModal";
 import { CycleReportModal } from "@/components/nutritionist/CycleReportModal";
 import { PlanHistoryModal } from "@/components/nutritionist/PlanHistoryModal";
+import { EditClientInfoModal } from "@/components/nutritionist/EditClientInfoModal";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History, PenLine } from "lucide-react";
+import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History, PenLine, Pencil, UtensilsCrossed } from "lucide-react";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -21,10 +22,15 @@ export default function ClientDetailPage() {
   const client = useAppStore((s) => s.clients.find((c) => c.id === clientId));
   const setCheckinConfig = useAppStore((s) => s.setCheckinConfig);
   const renewPlanCycle = useAppStore((s) => s.renewPlanCycle);
+  const updateClientProfile = useAppStore((s) => s.updateClientProfile);
+  const archiveClient = useAppStore((s) => s.archiveClient);
+  const unarchiveClient = useAppStore((s) => s.unarchiveClient);
+  const deleteClient = useAppStore((s) => s.deleteClient);
   const [showPrepSheet, setShowPrepSheet] = useState(false);
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [showCycleReport, setShowCycleReport] = useState(false);
   const [showPlanHistory, setShowPlanHistory] = useState(false);
+  const [showEditInfo, setShowEditInfo] = useState(false);
 
   if (!client) return null;
 
@@ -43,11 +49,25 @@ export default function ClientDetailPage() {
         <div className="w-14 h-14 rounded-full bg-sage-100 flex items-center justify-center font-medium text-lg text-sage-800">
           {client.initials}
         </div>
-        <div>
-          <h1 className="font-display text-xl text-moss-900">{client.name}</h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-xl text-moss-900">{client.name}</h1>
+            {client.archived && (
+              <span className="text-[10px] font-medium text-moss-500 bg-moss-900/5 px-2 py-0.5 rounded-full">
+                Archived
+              </span>
+            )}
+          </div>
           <Pill tone="sage">{client.planType}</Pill>
           <p className="text-xs text-moss-400 mt-1">{client.phone}</p>
         </div>
+        <button
+          onClick={() => setShowEditInfo(true)}
+          className="tap-scale w-9 h-9 rounded-full bg-white border border-sage-100/60 flex items-center justify-center shrink-0"
+          aria-label="Edit client info"
+        >
+          <Pencil size={14} className="text-moss-600" />
+        </button>
       </div>
 
       <button
@@ -115,7 +135,7 @@ export default function ClientDetailPage() {
 
       <button
         onClick={() => router.push(`/client/${client.id}/notes`)}
-        className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 shadow-card rounded-xl p-3.5 mb-5"
+        className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 shadow-card rounded-xl p-3.5 mb-2.5"
       >
         <div className="w-9 h-9 rounded-full bg-moss-900/5 flex items-center justify-center shrink-0">
           <PenLine size={16} className="text-moss-600" />
@@ -123,6 +143,21 @@ export default function ClientDetailPage() {
         <div className="text-left flex-1">
           <p className="text-sm font-medium text-moss-900">Notes &amp; plan reasoning</p>
           <p className="text-xs text-moss-400">Monthly note, meal reasoning, session notes</p>
+        </div>
+      </button>
+
+      <button
+        onClick={() => router.push(`/client/${client.id}/plan-editor`)}
+        className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 shadow-card rounded-xl p-3.5 mb-5"
+      >
+        <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+          <UtensilsCrossed size={16} className="text-amber-600" />
+        </div>
+        <div className="text-left flex-1">
+          <p className="text-sm font-medium text-moss-900">Weekly meal plan</p>
+          <p className="text-xs text-moss-400">
+            {client.weeklyPlan?.templateName ?? "No plan assigned yet"}
+          </p>
         </div>
       </button>
 
@@ -297,6 +332,28 @@ export default function ClientDetailPage() {
         )}
         {showPlanHistory && (
           <PlanHistoryModal client={client} onClose={() => setShowPlanHistory(false)} />
+        )}
+        {showEditInfo && (
+          <EditClientInfoModal
+            client={client}
+            onClose={() => setShowEditInfo(false)}
+            onSave={(updates) => {
+              updateClientProfile(client.id, updates);
+              setShowEditInfo(false);
+            }}
+            onArchive={() => {
+              archiveClient(client.id);
+              setShowEditInfo(false);
+            }}
+            onUnarchive={() => {
+              unarchiveClient(client.id);
+              setShowEditInfo(false);
+            }}
+            onDelete={() => {
+              deleteClient(client.id);
+              router.push("/dashboard");
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

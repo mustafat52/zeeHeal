@@ -1,4 +1,5 @@
 import { Client } from "./mock-data/clients";
+import { getDisplayStatus } from "./clientStatus";
 
 export interface DigestItem {
   type: "attention" | "win" | "new";
@@ -12,8 +13,9 @@ export function generateDigest(clients: Client[]): DigestItem[] {
 
   for (const client of clients) {
     const firstName = client.name.split(" ")[0];
+    const status = getDisplayStatus(client);
 
-    if (client.status === "needs-attention") {
+    if (status === "needs-attention") {
       items.push({
         type: "attention",
         clientId: client.id,
@@ -22,7 +24,7 @@ export function generateDigest(clients: Client[]): DigestItem[] {
       });
     }
 
-    if (client.status === "new") {
+    if (status === "new") {
       items.push({
         type: "new",
         clientId: client.id,
@@ -58,8 +60,8 @@ export function generateDigest(clients: Client[]): DigestItem[] {
 }
 
 export function digestSummaryLine(clients: Client[]): string {
-  const onTrack = clients.filter((c) => c.status === "on-track").length;
-  const needsAttention = clients.filter((c) => c.status === "needs-attention").length;
+  const onTrack = clients.filter((c) => getDisplayStatus(c) === "on-track").length;
+  const needsAttention = clients.filter((c) => getDisplayStatus(c) === "needs-attention").length;
   const parts: string[] = [];
   if (onTrack > 0) parts.push(`${onTrack} on track`);
   if (needsAttention > 0) parts.push(`${needsAttention} need${needsAttention === 1 ? "s" : ""} a nudge`);

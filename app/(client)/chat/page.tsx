@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useAppStore } from "@/lib/store";
-import { chatThreads, Message } from "@/lib/mock-data/messages";
 import { ZAINAB_PHONE } from "@/lib/mock-data/clients";
 import { VoiceRecorder } from "@/components/client/VoiceRecorder";
 import { VoiceMessageBubble } from "@/components/client/VoiceMessageBubble";
@@ -11,32 +10,19 @@ import clsx from "clsx";
 
 export default function ClientChatPage() {
   const activeClientId = useAppStore((s) => s.activeClientId);
-  const initialMessages = chatThreads[activeClientId] ?? [];
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const messages = useAppStore((s) => s.messagesByClient[activeClientId] ?? []);
+  const sendMessage = useAppStore((s) => s.sendMessage);
   const [input, setInput] = useState("");
 
   function send() {
     if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: String(Date.now()), sender: "client", text: input, time: "now" },
-    ]);
+    sendMessage(activeClientId, "client", { text: input });
     setInput("");
   }
 
   function sendVoice(audioUrl: string, duration: number) {
     if (!audioUrl) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: String(Date.now()),
-        sender: "client",
-        text: "",
-        time: "now",
-        audioUrl,
-        audioDuration: duration,
-      },
-    ]);
+    sendMessage(activeClientId, "client", { audioUrl, audioDuration: duration });
   }
 
   return (

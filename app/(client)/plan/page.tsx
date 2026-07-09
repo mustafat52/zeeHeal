@@ -296,13 +296,15 @@ export default function ClientPlanPage() {
   const hormonalSummary = client.condition === "hormonal" ? getHormonalSummary(client) : null;
   const skincareSummary = client.condition === "skincare" ? getSkincareSummary(client) : null;
 
-  const activeMeals = pcosPhase
+  const hasRealPlan = !!client.weeklyPlan?.days;
+  const fallbackMeals = pcosPhase
     ? pcosPhaseMeals[pcosPhase.key]
     : client.condition === "weight-loss"
     ? weightLossWeekMeals
     : client.condition === "skincare"
     ? skincareWeekMeals
     : weekMeals;
+  const activeMeals = client.weeklyPlan?.days ?? fallbackMeals;
 
   return (
     <div className="pt-12 px-5">
@@ -320,9 +322,11 @@ export default function ClientPlanPage() {
                 <p className="text-sm font-medium text-rose-800">{pcosPhase.phase}</p>
               </div>
               <p className="text-xs text-moss-600 leading-relaxed">{pcosPhase.tip}</p>
-              <p className="text-[10px] text-rose-700/70 mt-2 pt-2 border-t border-rose-100/60">
-                This week&apos;s meals below are set for your {pcosPhase.phase.toLowerCase()}.
-              </p>
+              {!hasRealPlan && (
+                <p className="text-[10px] text-rose-700/70 mt-2 pt-2 border-t border-rose-100/60">
+                  This week&apos;s meals below are set for your {pcosPhase.phase.toLowerCase()}.
+                </p>
+              )}
             </div>
           ) : (
             <div className="bg-sage-50 border border-sage-100 rounded-xl p-4">

@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import { clients as initialClients, Client, MealStatus, MealLog, DailyCheckin, CheckinConfig, PeriodLog, FlowIntensity, CycleSnapshot } from "./mock-data/clients";
+import { chatThreads as initialChatThreads, Message } from "./mock-data/messages";
+import { PlanTemplate, pcosPhaseStarterMeals, WeeklyMeals } from "./mock-data/plans";
+import { getPcosPhase } from "./conditionSummaries";
 
 export type ViewMode = "client" | "nutritionist";
 
@@ -31,6 +34,22 @@ interface AppState {
   archiveClient: (clientId: string) => void;
   unarchiveClient: (clientId: string) => void;
   deleteClient: (clientId: string) => void;
+
+  /**
+   * Shared across BOTH chat pages — this is the fix for the two sides
+   * never seeing each other's messages. Previously each chat page kept
+   * its own local useState seeded once from chatThreads, so a client's
+   * message never reached Zainab's view of the same conversation.
+   */
+  messagesByClient: Record<string, Message[]>;
+  sendMessage: (
+    clientId: string,
+    sender: "client" | "nutritionist",
+    content: { text?: string; audioUrl?: string; audioDuration?: number }
+  ) => void;
+
+  assignPlanToClient: (clientId: string, template: PlanTemplate) => void;
+  setClientWeeklyPlan: (clientId: string, days: WeeklyMeals) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -245,5 +264,69 @@ export const useAppStore = create<AppState>((set) => ({
   deleteClient: (clientId) =>
     set((state) => ({
       clients: state.clients.filter((c) => c.id !== clientId),
+    })),
+
+  messagesByClient: { ...initialChatThreads },
+
+  sendMessage: (clientId, sender, content) =>
+    set((state) => {
+      const thread = state.messagesByClient[clientId] ?? [];
+      const newMessage: Message = {
+        id: String(Date.now()),
+        sender,
+        text: content.text ?? "",
+        time: "Just now",
+        audioUrl: content.audioUrl,
+        audioDuration: content.audioDuration,
+      };
+      return {
+        messagesByClient: {
+          ...state.messagesByClient,
+          [clientId]: [...thread, newMessage],
+        },
+      };
+    }),
+
+  assignPlanToClient: (clientId, template) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+
+        // PCOS smart-fill: fork from whichever phase-set matches her
+        // current phase, if detectable, instead of the generic template.
+        // This does NOT create any ongoing link — it's a one-time,
+        // better-informed starting point. From here it's edited like any
+        // other assigned plan.
+        let sourceDays = template.weeklyMeals;
+        if (template.id === "pcos" && c.condition === "pcos") {
+          const hasActivePeriod = !!c.periodLogs?.length && !c.periodLogs[c.periodLogs.length - 1].endDate;
+          const phase = getPcosPhase(hasActivePeriod, c.todayCheckin?.cycleDay);
+          if (phase) sourceDays = pcosPhaseStarterMeals[phase.key];
+        }
+
+        return {
+          ...c,
+          weeklyPlan: {
+            templateId: template.id,
+            templateName: template.name,
+            days: JSON.parse(JSON.stringify(sourceDays)), // deep clone — never share references with the template
+          },
+        };
+      }),
+    })),
+
+  setClientWeeklyPlan: (clientId, days) =>
+    set((state) => ({
+      clients: state.clients.map((c) => {
+        if (c.id !== clientId) return c;
+        return {
+          ...c,
+          weeklyPlan: {
+            templateId: c.weeklyPlan?.templateId,
+            templateName: c.weeklyPlan?.templateName,
+            days,
+          },
+        };
+      }),
     })),
 }));
