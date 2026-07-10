@@ -1619,3 +1619,75 @@ Four open items carried forward, none blocking for the July 12 beta but worth tr
 3. Neither Plan Builder nor the plan editor filter/suggest templates by the client's actual condition — Zainab could currently assign the skincare template to a PCOS client with no warning
 4. Backend implementation (`BACKEND_PLAN.md`) — not yet started; six decisions from that doc's §8 still need locking before any Supabase/migration work begins
 
+## Session 12 — July 9, 2026 · Zainab's side: fully complete (template creation/editing, condition warnings, unsaved-change tracking)
+
+### Summary of what was done this session
+Closed all three items carried forward from Session 11's "what's next" list, completing Zainab's side before backend work begins. The largest piece: template creation/editing required moving `planTemplates` out of a static import and into real Zustand store state — templates can't be created or edited at runtime if they're not actually mutable state.
+
+---
+
+### `lib/mock-data/plans.ts` — Updated
+
+Added `condition: ConditionType` to `PlanTemplate`, assigned to all 4 existing templates (Gut health reset → hormonal, per its original Session 2 lineage before Priya's condition was reassigned; PCOS/hormone balance → pcos; Sustainable weight loss → weight-loss; Skin and gut reset → skincare). This is what powers the new mismatch warning in the assignment flow.
+
+---
+
+### `lib/store.ts` — Updated
+
+**Before:** `planTemplates` lived as a static array imported directly from `lib/mock-data/plans.ts` — no way to create, edit, or delete a template without editing source code.
+
+**After:**
+- `planTemplates` moved into store state, seeded from the same array at initialization
+- Added `addPlanTemplate`, `updatePlanTemplate`, `deletePlanTemplate`
+- `assignPlanToClient`'s deep-clone-on-fork behavior is unaffected by this move — templates being real state now doesn't change the fact that assigning one still copies its content rather than linking to it, so editing or deleting a template afterward never touches any client who already has their own copy
+
+---
+
+### `app/(nutritionist)/plan-builder/[templateId]/page.tsx` — New file
+
+One page handles both creation (`templateId === "new"`) and editing (real template id) via the dynamic route segment. Same day/meal editing pattern as the client-facing plan editor (Mon–Sun picker, per-meal text inputs). Editing an existing template shows how many clients are currently assigned to it and explicitly states their copies won't change. Includes a two-step gated delete (same "Danger zone" pattern as `EditClientInfoModal`), with the confirmation message distinguishing whether any clients are currently on the template.
+
+---
+
+### `app/(nutritionist)/plan-builder/page.tsx` — Updated
+
+- Reads `planTemplates` from the store instead of the static import
+- "New plan template" button now actually navigates to the create flow (previously a dead button)
+- Each template card gets a small edit-pencil next to its name, opening the same page in edit mode
+
+---
+
+### `components/nutritionist/AssignPlanModal.tsx` — Updated
+
+Each client row now shows a non-blocking amber warning if the template's `condition` doesn't match the client's own — e.g. assigning the PCOS template to a weight-loss client surfaces "Template is for pcos · client is weight-loss" before Zainab confirms. Deliberately not blocking: she may have a real reason to deviate that the app can't know about; the warning is there so it's never an *accidental* mismatch.
+
+---
+
+### `app/(nutritionist)/client/[id]/plan-editor/page.tsx` — Updated
+
+Added `dirtyDays` tracking — editing any meal marks that day dirty, shown as a small amber dot on its picker pill. Footer text now reads a real count ("2 days with unsaved changes") instead of a static reminder sentence. Saving clears all dirty markers at once, consistent with the existing "one save commits the whole week" behavior.
+
+---
+
+### Git detailsCommit:   a6869d6
+Message:  "zainab side done and dusted"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 7
+Insertions:    +462
+Deletions:     -30
+New files created:
+app/(nutritionist)/plan-builder/[templateId]/page.tsx
+Modified files:
+lib/mock-data/plans.ts
+lib/store.ts
+app/(nutritionist)/plan-builder/page.tsx
+components/nutritionist/AssignPlanModal.tsx
+app/(nutritionist)/client/[id]/plan-editor/page.tsx
+
+---
+
+### What's next
+Zainab's side is complete — no deliberately-deferred placeholders remain across dashboard, client management, cycle reporting, plan history, notes/reasoning authoring, or plan template creation/assignment/editing.
+
+**Backend implementation starts next**, in a new conversation. Starting point: `BACKEND_PLAN.md` §8 — six decisions listed there, with #2 (auth: no OTP, ever) already resolved earlier in this project. The other five (Supabase confirmation, the `energy` field addition, chat/inbox scope, seeding the 4 mock personas vs. fresh signups, and confirming Supabase project provisioning happens in parallel) still need locking before migrations get written.

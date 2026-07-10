@@ -7,22 +7,26 @@ export function Button({
   variant = "primary",
   className,
   type = "button",
+  disabled = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: "primary" | "secondary" | "ghost";
   className?: string;
   type?: "button" | "submit";
+  disabled?: boolean;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       className={clsx(
         "tap-scale rounded-xl px-5 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors",
         variant === "primary" && "bg-sage-600 text-white hover:bg-sage-800",
         variant === "secondary" && "bg-sage-100 text-sage-800 hover:bg-sage-200",
         variant === "ghost" && "bg-transparent text-moss-600 hover:bg-sage-50",
+        disabled && "opacity-50 cursor-not-allowed",
         className
       )}
     >
