@@ -1691,3 +1691,125 @@ app/(nutritionist)/client/[id]/plan-editor/page.tsx
 Zainab's side is complete — no deliberately-deferred placeholders remain across dashboard, client management, cycle reporting, plan history, notes/reasoning authoring, or plan template creation/assignment/editing.
 
 **Backend implementation starts next**, in a new conversation. Starting point: `BACKEND_PLAN.md` §8 — six decisions listed there, with #2 (auth: no OTP, ever) already resolved earlier in this project. The other five (Supabase confirmation, the `energy` field addition, chat/inbox scope, seeding the 4 mock personas vs. fresh signups, and confirming Supabase project provisioning happens in parallel) still need locking before migrations get written.
+
+
+## Session 13 — July 10, 2026 · Backend Phase A: Supabase provisioning, phone+passcode auth
+
+### Summary of what was done this session
+Backend implementation began, picking up from `BACKEND_PLAN.md` §8. Per explicit instruction this session, wherever `BACKEND_PLAN.md` (written July 7) conflicted with the actual current code (Sessions 11–12), the code won. Five open decisions from §8 were locked, a live Supabase project was provisioned end-to-end (schema, RLS, one RPC, storage), and real phone+passcode authentication replaced the mock client-picker on the login page. Account *creation* (wiring `NewClientFormModal` to actually create an auth user) is still open — login can authenticate but nothing exists yet to log into.
+
+---
+
+### Decisions locked this session
+1. Add a real `energy` column to `daily_checkins` — yes
+2. Chat/inbox in Phase A scope — yes
+3. Seed the 4 mock personas as demo accounts — yes, but most testing will be via fresh signups
+4. RLS scoping — hardcoded to Zainab as the single nutritionist (not `nutritionist_id`-scoped), for simplicity over future-proofing
+5. Client login mechanism — **not** magic link as originally planned in `BACKEND_PLAN.md`. Revised to phone number + a simple passcode (admin-created, pre-confirmed Supabase Auth accounts, no SMS/OTP infrastructure), since magic link requires an email address the app never collects, and true phone OTP was ruled out earlier for DLT/timeline risk.
+
+---
+
+### Deltas applied from `BACKEND_PLAN.md`, per actual code (Sessions 11–12)
+- `archived` implemented as its own boolean column on `clients`, not a value inside `status`'s check constraint — confirmed against the `Client` type and `getDisplayStatus`, which treat the two as orthogonal.
+- `plan_templates` table added — didn't exist in `BACKEND_PLAN.md` at all (predates Session 12's move of `planTemplates` into real store state).
+- `weekly_plan_template_id` / `weekly_plan_template_name` / `weekly_plan_days` added to `clients` — the forked, independently-editable plan copy from `assignPlanToClient`. `ON DELETE SET NULL` on the template FK, matching the deep-clone/no-live-link behavior in `lib/store.ts`.
+
+---
+
+### `supabase/0001_init.sql` — New file
+Initial schema: `nutritionists`, `plan_templates`, `clients`, `cycle_history`, `daily_checkins` (includes `energy`), `progress_weekly` (view), `period_logs`, `period_flow_logs`, `meals`, `session_notes`, `messages`, plus `updated_at` triggers on `clients` and `plan_templates`.
+
+Open item flagged, not solved here: how a given date's `meals` rows get generated from `weekly_plan_days` (or the condition fallback set) day to day is an application-layer decision, deferred to whenever the client home/plan pages get wired to real data.
+
+---
+
+### `supabase/0002_rls.sql` — New file
+RLS policies for every table, hardcoded to the single-nutritionist model (`is_nutritionist()` / `client_owns()` helper functions). `cycle_history` has no INSERT policy for either role by design — writes only happen through the `renew_plan_cycle` RPC, which bypasses RLS as `security definer`. `messages` insert policy blocks a client from posting as `sender = 'nutritionist'`.
+
+---
+
+### `supabase/0003_renew_plan_cycle.sql` — New file
+Atomic RPC replacing the client-side `renewPlanCycle` store action for real data — inserts into `cycle_history` and resets `clients`' cycle fields in one transaction, with a `for update` row lock to prevent a double-click from producing duplicate cycle-history rows. Runs `security definer`; does its own internal `is_nutritionist()` authorization check since RLS is bypassed.
+
+---
+
+### `supabase/0004_storage_policies.sql` — New file
+RLS policies for three storage buckets (`meal-photos`, `skin-photos`, `voice-notes`; created via dashboard, not SQL — all private, size/MIME-restricted). Delta from `BACKEND_PLAN.md` §3: that doc says Zainab can read-only across all three buckets, but `voice-notes` needed to be an exception — `VoiceRecorder` is used on both the client and nutritionist chat pages, so both sides need write access there.
+
+---
+
+### `lib/supabase/client.ts` — New file
+Browser-side Supabase client for Client Components, using `createBrowserClient` from `@supabase/ssr`.
+
+---
+
+### `lib/supabase/server.ts` — New file
+Server-side Supabase client for Server Components/Route Handlers/Server Actions, cookie-bound per request. Its cookie-write no-op is intentional — Server Components can't write cookies; `middleware.ts` handles session refresh instead.
+
+---
+
+### `middleware.ts` — New file
+Root-level middleware refreshing the Supabase auth session on every matching request — the piece that makes `server.ts`'s no-op cookie writes safe.
+
+---
+
+### `lib/supabase/admin.ts` — New file
+Server-only admin client using the secret key (`SUPABASE_SECRET_KEY`, never `NEXT_PUBLIC_`-prefixed), for the one operation an RLS-respecting client can't do: creating a pre-confirmed phone+password auth user without triggering an SMS flow. Throws if accidentally imported into browser code (`typeof window !== "undefined"` guard).
+
+---
+
+### `lib/phone.ts` — New file
+Shared phone-normalization utility (E.164 without a leading `+`, per Supabase's requirement) — split out from `admin.ts` specifically so the login page (a Client Component) can reuse the same normalization logic without pulling server-only code into the browser bundle.
+
+---
+
+### `app/login/page.tsx` — Updated
+**Before:** Mock client picker — buttons to fake-login as any of the 4 seeded personas or as Zainab, no real auth.
+
+**After:** Real form, phone number + passcode, calling `supabase.auth.signInWithPassword({ phone, password })`. On success, checks the `nutritionists` table first (single-nutritionist app), then falls back to `clients` matched by `auth_user_id`. Includes `mapDbClientToStoreClient` — a deliberate bridge function, not a finished data layer: hydrates a real client's core profile fields into the existing Zustand store on login so downstream pages keep working unmodified, but `todayPlan`, `progress`, `checkinHistory`, `periodLogs`, `cycleHistory`, and `todayCheckin` are left as explicit placeholders (each needs its own query when that page's turn comes). `notes` is left permanently empty for the client side, not just as a placeholder — `session_notes` is nutritionist-only per RLS.
+
+---
+
+### `components/ui/Button.tsx` — Updated
+Added a `disabled` prop (previously unsupported, caught by a TS error once the login page tried to pass it) — disables the underlying `<button>` and applies a dimmed/no-pointer style.
+
+---
+
+### Supabase project provisioning (dashboard, not code)
+- Project `zeeHeal` created, region Asia-Pacific, automatic RLS enabled, auto-expose-new-tables disabled
+- Buckets created: `meal-photos` (10MB, image/jpeg+png+webp), `skin-photos` (10MB, same), `voice-notes` (25MB, audio/webm) — all private
+- Env vars set (`.env.local` + Vercel, all three environments): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (using the new publishable-key format, `sb_publishable_...` — this project only has new-format keys, no legacy anon JWT), `SUPABASE_SECRET_KEY` (server-only, not `NEXT_PUBLIC_`-prefixed)
+- **Manual dashboard step required, not yet confirmed done:** enable Phone provider under Authentication → Providers (no SMS provider configured — password-only usage, no OTP sent)
+
+**Note:** migrations were saved to `supabase/` directly (per the commit below), not `supabase/migrations/` as originally instructed — fine for the manual SQL-Editor workflow used throughout this session, but worth moving into `supabase/migrations/` before ever adopting the Supabase CLI (`supabase db push` expects that path).
+
+---
+
+### Git details
+Commit:   235db2c
+Message:  "firsh push of backend"
+Branch:   main
+Remote:   https://github.com/mustafat52/zeeHeal.git
+Files changed: 13
+Insertions:    +1368
+Deletions:     -62
+New files created (confirmed from terminal output):
+backend.md
+lib/phone.ts
+lib/supabase/admin.ts
+lib/supabase/client.ts
+supabase/0001_init.sql
+supabase/0002_rls.sql
+supabase/0003_renew_plan_cycle.sql
+supabase/0004_storage_policies.sql
+(5 additional changed files not fully visible in the shared terminal output — almost certainly includes app/login/page.tsx and lib/supabase/server.ts/middleware.ts; components/ui/Button.tsx's disabled-prop fix landed after this commit and is not yet pushed)
+
+---
+
+### What's next
+1. **Not yet committed:** the `Button.tsx` disabled-prop fix — happened after this push, needs its own commit
+2. **Wiring `NewClientFormModal`** to actually call `admin.auth.admin.createUser()` (phone + passcode, `phone_confirm: true`) and insert the real `clients` row — this is what makes an account exist to log into. Nothing is testable end-to-end until this lands.
+3. Confirm the Phone provider toggle is actually enabled in Supabase's dashboard (Authentication → Providers) — not yet confirmed done this session
+4. Per-page real data wiring, each still a placeholder from the login bridge: `todayPlan` (needs `meals` query + the still-open "how do daily meal rows get generated" decision), `progress` (needs `progress_weekly` view query), `checkinHistory`/`todayCheckin` (needs `daily_checkins` query), `periodLogs` (needs `period_logs`/`period_flow_logs` query), `cycleHistory` (needs `cycle_history` query)
+5. `npm audit` showed 7 vulnerabilities (1 moderate, 5 high, 1 critical) — deferred, not run with `--force`; worth a real look post-beta
+6. Timeline: beta target is July 12 — 2 days out as of this session
