@@ -21,6 +21,7 @@ export async function createClientAccount(input: {
   planType: string;
   programDurationMonths?: number | null;
   checkinConfig: CheckinConfig;
+  customPasscode?: string;
 }): Promise<CreateClientResult> {
   // Auth check happens against the cookie-bound, RLS-respecting server
   // client — NOT the admin client. Only a logged-in Zainab can reach past
@@ -46,7 +47,13 @@ export async function createClientAccount(input: {
   }
 
   const syntheticEmail = phoneToSyntheticEmail(input.phone);
-  const passcode = generatePasscode();
+
+  // Re-validate here even though the form already checks this — a client-side
+  // check can always be bypassed (devtools, direct call, etc).
+  if (input.customPasscode && input.customPasscode.length < 4) {
+    return { success: false, error: "Passcode must be at least 4 digits." };
+  }
+  const passcode = input.customPasscode?.trim() || generatePasscode();
   const admin = createAdminClient();
 
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({

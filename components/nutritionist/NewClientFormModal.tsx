@@ -60,6 +60,7 @@ export function NewClientFormModal({
   const [condition, setCondition] = useState<ConditionType>("weight-loss");
   const [config, setConfig] = useState<CheckinConfig>({});
   const [programDurationMonths, setProgramDurationMonths] = useState<number | null>(null);
+  const [customPasscode, setCustomPasscode] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -78,7 +79,8 @@ export function NewClientFormModal({
     setConfig(next);
   }
 
-  const canSave = name.trim().length > 0 && phone.trim().length > 0;
+  const passcodeValid = customPasscode.length === 0 || customPasscode.length >= 4;
+  const canSave = name.trim().length > 0 && phone.trim().length > 0 && passcodeValid;
 
   async function handleSave() {
     if (!canSave || saving) return;
@@ -93,6 +95,7 @@ export function NewClientFormModal({
       planType: planType.trim() || "General nutrition",
       programDurationMonths,
       checkinConfig: config,
+      customPasscode: customPasscode.trim() || undefined,
     });
 
     setSaving(false);
@@ -194,6 +197,19 @@ export function NewClientFormModal({
               This becomes their login. A passcode is generated automatically once you save — you'll share it with them yourself.
             </p>
 
+            <p className="text-xs font-medium text-moss-600 mb-2">Passcode</p>
+            <input
+              value={customPasscode}
+              onChange={(e) => setCustomPasscode(e.target.value.replace(/\D/g, ""))}
+              placeholder="Leave blank to auto-generate"
+              inputMode="numeric"
+              maxLength={6}
+              className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-2.5"
+            />
+            <p className="text-[11px] text-moss-400 mb-5">
+              At least 4 digits, if set. Otherwise one is generated automatically.
+            </p>
+
             <p className="text-xs font-medium text-moss-600 mb-2">What are you treating?</p>
             <div className="flex flex-wrap gap-2 mb-5">
               {presets.map((preset) => (
@@ -291,7 +307,9 @@ export function NewClientFormModal({
               <UserPlus size={16} /> {saving ? "Creating account..." : "Add client"}
             </Button>
             {!canSave && (
-              <p className="text-[11px] text-moss-400 text-center mt-2">Name and phone number are required</p>
+              <p className="text-[11px] text-moss-400 text-center mt-2">
+                {!passcodeValid ? "Passcode must be at least 4 digits" : "Name and phone number are required"}
+              </p>
             )}
           </>
         )}

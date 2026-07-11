@@ -15,6 +15,15 @@ interface AppState {
 
   clients: Client[];
   addClient: (client: Client) => void;
+  /**
+   * Bulk-replaces the entire client list — used by the nutritionist
+   * dashboard to hydrate real data from Supabase on load, replacing
+   * whatever was there (the initial mock personas) wholesale rather than
+   * merging. Distinct from addClient, which appends one client without
+   * touching the rest (used right after NewClientFormModal creates
+   * someone, so the list updates optimistically without a full refetch).
+   */
+  setClients: (clients: Client[]) => void;
   toggleMeal: (clientId: string, mealId: string) => void;
   logMeal: (clientId: string, mealId: string, log: MealLog) => void;
   addWater: (clientId: string) => void;
@@ -73,6 +82,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   clients: initialClients,
   addClient: (client) => set((state) => ({ clients: [...state.clients, client] })),
+  setClients: (clients) => set({ clients }),
 
   toggleMeal: (clientId, mealId) =>
     set((state) => ({
