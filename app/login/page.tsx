@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { WelcomeTransition } from "@/components/ui/WelcomeTransition";
 import { motion, AnimatePresence } from "framer-motion";
 import { mapDbClientToStoreClient } from "@/lib/mapDbClient";
+import type { Client } from "@/lib/mock-data/clients";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function LoginPage() {
   const [passcode, setPasscode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [welcoming, setWelcoming] = useState<{ mode: "client" | "nutritionist"; name: string } | null>(null);
+  const [welcoming, setWelcoming] = useState<{ mode: "client" | "nutritionist"; name: string; condition?: Client["condition"] } | null>(null);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -78,7 +79,7 @@ export default function LoginPage() {
     }
     setActiveClientId(mappedClient.id);
     setViewMode("client");
-    setWelcoming({ mode: "client", name: mappedClient.name.split(" ")[0] });
+    setWelcoming({ mode: "client", name: mappedClient.name.split(" ")[0], condition: mappedClient.condition });
     setTimeout(() => router.push("/home"), 1500);
   }
 
@@ -143,6 +144,7 @@ export default function LoginPage() {
             <WelcomeTransition
               greeting={`Welcome back, ${welcoming.name}`}
               subtitle="Let's see how today's going"
+              condition={welcoming.condition}
             />
           </motion.div>
         )}
