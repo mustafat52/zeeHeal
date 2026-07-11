@@ -14,3 +14,19 @@ export function normalizePhoneForAuth(rawPhone: string): string {
   if (digitsOnly.length === 10) return `91${digitsOnly}`;
   return digitsOnly.replace(/^0+/, ""); // strip any leading trunk-prefix zero
 }
+
+/**
+ * Supabase's Phone auth provider requires a configured SMS vendor
+ * (Twilio/etc) before the dashboard will even save the toggle — even
+ * though we never send an OTP, only use phone as a password-auth
+ * identifier. Rather than stand up SMS infrastructure we don't need,
+ * auth runs on the Email provider (already enabled, zero vendor setup)
+ * using a synthetic, never-delivered email built from the normalized
+ * phone number. The person never sees or types this — they still enter
+ * their real phone number everywhere in the UI; this conversion happens
+ * only at the two points that talk to supabase.auth directly (account
+ * creation, sign-in).
+ */
+export function phoneToSyntheticEmail(rawPhone: string): string {
+  return `${normalizePhoneForAuth(rawPhone)}@zeeheal-app.local`;
+}

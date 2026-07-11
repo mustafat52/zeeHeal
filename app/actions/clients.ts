@@ -2,7 +2,7 @@
 
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizePhoneForAuth } from "@/lib/phone";
+import { normalizePhoneForAuth, phoneToSyntheticEmail } from "@/lib/phone";
 import type { ConditionType, CheckinConfig } from "@/lib/mock-data/clients";
 
 function generatePasscode(): string {
@@ -45,14 +45,14 @@ export async function createClientAccount(input: {
     return { success: false, error: "Only Zainab's account can add clients." };
   }
 
-  const normalizedPhone = normalizePhoneForAuth(input.phone);
+  const syntheticEmail = phoneToSyntheticEmail(input.phone);
   const passcode = generatePasscode();
   const admin = createAdminClient();
 
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
-    phone: normalizedPhone,
+    email: syntheticEmail,
     password: passcode,
-    phone_confirm: true, // pre-confirmed — no SMS ever sent, see lib/supabase/admin.ts
+    email_confirm: true, // pre-confirmed — no email ever sent, see lib/phone.ts
   });
 
   if (authError || !authUser.user) {

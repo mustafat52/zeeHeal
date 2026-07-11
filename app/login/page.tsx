@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
-import { normalizePhoneForAuth } from "@/lib/phone";
+import { normalizePhoneForAuth, phoneToSyntheticEmail } from "@/lib/phone";
 import { Button } from "@/components/ui/Button";
 import { WelcomeTransition } from "@/components/ui/WelcomeTransition";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,10 +30,10 @@ export default function LoginPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const normalizedPhone = normalizePhoneForAuth(phone);
+    const syntheticEmail = phoneToSyntheticEmail(phone);
 
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      phone: normalizedPhone,
+      email: syntheticEmail,
       password: passcode,
     });
 
