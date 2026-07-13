@@ -7,7 +7,7 @@ import clsx from "clsx";
 export function VoiceRecorder({
   onRecorded,
 }: {
-  onRecorded: (audioUrl: string, duration: number) => void;
+  onRecorded: (audioUrl: string, duration: number, blob?: Blob) => void;
 }) {
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -25,7 +25,7 @@ export function VoiceRecorder({
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         const url = URL.createObjectURL(blob);
-        onRecorded(url, seconds);
+        onRecorded(url, seconds, blob);
         stream.getTracks().forEach((t) => t.stop());
       };
 

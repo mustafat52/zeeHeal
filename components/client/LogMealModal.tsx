@@ -17,9 +17,10 @@ export function LogMealModal({
   mealLabel: string;
   mealItems: string;
   onClose: () => void;
-  onSave: (data: { photo?: string; note?: string }) => void;
+  onSave: (data: { photo?: string; file?: File; note?: string }) => void;
 }) {
   const [photo, setPhoto] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,6 +28,7 @@ export function LogMealModal({
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = () => setPhoto(reader.result as string);
     reader.readAsDataURL(file);
@@ -40,7 +42,7 @@ export function LogMealModal({
 
   function handleSave() {
     const combinedNote = [note, activeTags.join(", ")].filter(Boolean).join(" · ");
-    onSave({ photo: photo ?? undefined, note: combinedNote || undefined });
+    onSave({ photo: photo ?? undefined, file: photoFile ?? undefined, note: combinedNote || undefined });
   }
 
   return (
@@ -80,7 +82,10 @@ export function LogMealModal({
           <div className="relative mb-4">
             <img src={photo} alt="Logged meal" className="w-full h-44 object-cover rounded-xl" />
             <button
-              onClick={() => setPhoto(null)}
+              onClick={() => {
+                setPhoto(null);
+                setPhotoFile(null);
+              }}
               className="tap-scale absolute top-2 right-2 w-7 h-7 rounded-full bg-moss-900/60 flex items-center justify-center"
               aria-label="Remove photo"
             >

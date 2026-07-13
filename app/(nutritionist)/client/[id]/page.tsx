@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { mapDbCheckinToDailyCheckin } from "@/lib/mapDbCheckin";
+import { mapDbPeriodLogRows } from "@/lib/mapDbPeriod";
+import { buildCheckinHistoryFromRows } from "@/lib/mapDbProgress";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +25,9 @@ export default function ClientDetailPage() {
   const clientId = params.id as string;
   const client = useAppStore((s) => s.clients.find((c) => c.id === clientId));
   const setCheckinConfig = useAppStore((s) => s.setCheckinConfig);
+  const setClientTodayCheckin = useAppStore((s) => s.setClientTodayCheckin);
+  const setClientPeriodLogs = useAppStore((s) => s.setClientPeriodLogs);
+  const setClientCheckinHistory = useAppStore((s) => s.setClientCheckinHistory);
   const renewPlanCycle = useAppStore((s) => s.renewPlanCycle);
   const updateClientProfile = useAppStore((s) => s.updateClientProfile);
   const archiveClient = useAppStore((s) => s.archiveClient);
@@ -31,6 +38,99 @@ export default function ClientDetailPage() {
   const [showCycleReport, setShowCycleReport] = useState(false);
   const [showPlanHistory, setShowPlanHistory] = useState(false);
   const [showEditInfo, setShowEditInfo] = useState(false);
+
+  // Pulls in today's REAL check-in from daily_checkins — this is what
+  // actually closes the "client logs something, Zainab can see it" loop
+  // for check-ins specifically. NOT yet real-time: if the client logs
+  // something while she's already sitting on this page, she won't see it
+  // until she reloads or navigates back to it. NOTE: todayPlan.meals,
+  // client.progress (weight trend chart below), and client.notes are
+  // still the empty placeholders from the login-hydration bridge — this
+  // fetch only covers today's check-in, not those.
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+
+    async function loadTodayCheckin() {
+      const supabase = createClient();
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("daily_checkins")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("checkin_date", today)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (!error && data) {
+        setClientTodayCheckin(clientId, mapDbCheckinToDailyCheckin(data));
+      }
+    }
+
+    loadTodayCheckin();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, setClientTodayCheckin]);
+
+  // Zainab's independent hydration path for periodLogs — client.periodLogs
+  // otherwise only gets populated when the CLIENT's own PeriodCalendar
+  // mounts, in a completely different browser session. Gated to PCOS
+  // clients only, since that's the only condition CycleReportModal's
+  // period section (and this page, indirectly) actually uses it for.
+  useEffect(() => {
+    if (!clientId || client?.condition !== "pcos") return;
+    let cancelled = false;
+
+    async function loadPeriodLogs() {
+      const supabase = createClient();
+      const { data: logs, error } = await supabase
+        .from("period_logs")
+        .select("*, period_flow_logs(*)")
+        .eq("client_id", clientId)
+        .order("start_date", { ascending: true });
+
+      if (cancelled || error || !logs) return;
+      setClientPeriodLogs(clientId, mapDbPeriodLogRows(logs));
+    }
+
+    loadPeriodLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, client?.condition, setClientPeriodLogs]);
+
+  // Zainab's independent hydration path for checkinHistory — same gap as
+  // periodLogs above. Without this, CycleReportModal's "day by day" bar
+  // charts (DailyBarStrip via getConfiguredChartFields) always render
+  // empty on her side, even when the client's own Progress page correctly
+  // shows real data, since checkinHistory was only ever wired for that
+  // client-side page's own load effect.
+  useEffect(() => {
+    if (!clientId || !client) return;
+    let cancelled = false;
+
+    async function loadCheckinHistory() {
+      const supabase = createClient();
+      const { data: rows, error } = await supabase
+        .from("daily_checkins")
+        .select("*")
+        .eq("client_id", clientId)
+        .gte("checkin_date", client!.planCycle.startDate)
+        .order("checkin_date", { ascending: true });
+
+      if (cancelled || error || !rows) return;
+      setClientCheckinHistory(
+        clientId,
+        buildCheckinHistoryFromRows(rows, client!.planCycle.startDate, client!.planCycle.totalDays)
+      );
+    }
+
+    loadCheckinHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, client?.planCycle.startDate, client?.planCycle.totalDays, setClientCheckinHistory]);
 
   if (!client) return null;
 

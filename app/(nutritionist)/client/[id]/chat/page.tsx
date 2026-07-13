@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { loadMessagesForClient } from "@/lib/mapDbMessages";
 import { VoiceRecorder } from "@/components/client/VoiceRecorder";
 import { VoiceMessageBubble } from "@/components/client/VoiceMessageBubble";
 import { ChevronLeft, Send, Phone } from "lucide-react";
@@ -15,7 +17,21 @@ export default function NutritionistChatPage() {
   const client = useAppStore((s) => s.clients.find((c) => c.id === clientId));
   const messages = useAppStore((s) => s.messagesByClient[clientId] ?? []);
   const sendMessage = useAppStore((s) => s.sendMessage);
+  const setMessagesForClient = useAppStore((s) => s.setMessagesForClient);
   const [input, setInput] = useState("");
+
+  // Same not-real-time caveat as the client chat page — loads on open,
+  // won't reflect a message the client sends while this page stays open.
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+    loadMessagesForClient(clientId).then((msgs) => {
+      if (!cancelled) setMessagesForClient(clientId, msgs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, setMessagesForClient]);
 
   if (!client) return null;
 
@@ -25,9 +41,24 @@ export default function NutritionistChatPage() {
     setInput("");
   }
 
-  function sendVoice(audioUrl: string, duration: number) {
+  async function sendVoice(audioUrl: string, duration: number, blob?: Blob) {
     if (!audioUrl) return;
-    sendMessage(clientId, "nutritionist", { audioUrl, audioDuration: duration });
+
+    let audioStoragePath: string | undefined;
+    if (blob) {
+      const supabase = createClient();
+      const path = `${clientId}/${Date.now()}.webm`;
+      const { error } = await supabase.storage
+        .from("voice-notes")
+        .upload(path, blob, { contentType: "audio/webm" });
+      if (error) {
+        console.error("Failed to upload voice note:", error.message);
+      } else {
+        audioStoragePath = path;
+      }
+    }
+
+    sendMessage(clientId, "nutritionist", { audioUrl, audioDuration: duration }, audioStoragePath);
   }
 
   return (

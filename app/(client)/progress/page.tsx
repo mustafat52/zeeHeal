@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { mapProgressWeeklyRows, buildCheckinHistoryFromRows } from "@/lib/mapDbProgress";
 import { Card } from "@/components/ui/Card";
 import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendingDown, TrendingUp, Droplet, Target } from "lucide-react";
@@ -27,10 +29,82 @@ function useChartWidth() {
 export default function ClientProgressPage() {
   const activeClientId = useAppStore((s) => s.activeClientId);
   const client = useAppStore((s) => s.clients.find((c) => c.id === activeClientId));
+  const setClientProgress = useAppStore((s) => s.setClientProgress);
+  const setClientCheckinHistory = useAppStore((s) => s.setClientCheckinHistory);
   const weightChart = useChartWidth();
   const energyChart = useChartWidth();
+  const [loading, setLoading] = useState(true);
+
+  // Loads real progress_weekly + daily_checkins data once per client.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!client) return;
+    let cancelled = false;
+
+    async function loadProgress() {
+      setLoading(true);
+      const supabase = createClient();
+
+      const [{ data: progressRows, error: progressError }, { data: checkinRows, error: checkinError }] =
+        await Promise.all([
+          supabase
+            .from("progress_weekly")
+            .select("*")
+            .eq("client_id", client!.id)
+            .order("week_start", { ascending: true }),
+          supabase
+            .from("daily_checkins")
+            .select("*")
+            .eq("client_id", client!.id)
+            .gte("checkin_date", client!.planCycle.startDate)
+            .order("checkin_date", { ascending: true }),
+        ]);
+
+      if (cancelled) return;
+
+      if (!progressError && progressRows) {
+        setClientProgress(client!.id, mapProgressWeeklyRows(progressRows));
+      }
+      if (!checkinError && checkinRows) {
+        setClientCheckinHistory(
+          client!.id,
+          buildCheckinHistoryFromRows(checkinRows, client!.planCycle.startDate, client!.planCycle.totalDays)
+        );
+      }
+      setLoading(false);
+    }
+
+    loadProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, [client?.id]);
 
   if (!client) return null;
+
+  if (loading) {
+    return (
+      <div className="pt-12 px-5">
+        <h1 className="font-display text-2xl text-moss-900 mb-1">Your progress</h1>
+        <p className="text-sm text-moss-400 text-center py-16">Loading your progress...</p>
+      </div>
+    );
+  }
+
+  // Real, brand-new clients can genuinely have zero progress data — the
+  // mock always had at least one entry, so this guard didn't exist before
+  // and the page would crash on client.progress[0].weight otherwise.
+  if (client.progress.length === 0) {
+    return (
+      <div className="pt-12 px-5">
+        <h1 className="font-display text-2xl text-moss-900 mb-1">Your progress</h1>
+        <p className="text-sm text-moss-400 mb-5">Since {client.startDate}</p>
+        <p className="text-sm text-moss-400 text-center py-16">
+          No check-ins logged yet — your progress will show up here once you start logging.
+        </p>
+      </div>
+    );
+  }
 
   const first = client.progress[0];
   const last = client.progress[client.progress.length - 1];

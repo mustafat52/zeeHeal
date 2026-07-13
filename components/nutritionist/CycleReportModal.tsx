@@ -6,6 +6,7 @@ import { PatientProfileCard } from "./PatientProfileCard";
 import { DailyBarStrip } from "./DailyBarStrip";
 import { PeriodFlowStrip } from "./PeriodFlowStrip";
 import { buildFlowDataForCycle } from "@/lib/period";
+import { isoDateToRelativeLabel } from "@/lib/periodDateLabels";
 import { getConfiguredChartFields } from "@/lib/checkinCharts";
 import {
   getPcosPhase,
@@ -60,7 +61,15 @@ export function CycleReportModal({
   const skincareSummary = client.condition === "skincare" ? getSkincareSummary(client) : null;
 
   const chartFields = getConfiguredChartFields(client, history);
-  const flowData = buildFlowDataForCycle(client.periodLogs, client.planCycle.startDate, totalDays);
+  // planCycle.startDate is a real ISO date now (current_cycle_start from
+  // Supabase), but buildFlowDataForCycle's parseRelativeDate only
+  // understands "Today"/"N days ago" — converting here at the call site
+  // rather than touching lib/period.ts, which is correct as written.
+  const flowData = buildFlowDataForCycle(
+    client.periodLogs,
+    isoDateToRelativeLabel(client.planCycle.startDate),
+    totalDays
+  );
   const hasFlowLogged = flowData.some((v) => v !== null);
 
   const lastPeriod = client.periodLogs?.[client.periodLogs.length - 1];

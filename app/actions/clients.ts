@@ -101,3 +101,49 @@ export async function createClientAccount(input: {
 
   return { success: true, passcode, client: clientRow };
 }
+
+export type DeleteClientResult = { success: true } | { success: false; error: string };
+
+export async function deleteClientAccount(clientId: string): Promise<DeleteClientResult> {
+  const supabase = await createServerSupabaseClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not logged in." };
+
+  const { data: nutritionistRow } = await supabase
+    .from("nutritionists")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!nutritionistRow) return { success: false, error: "Only Zainab's account can delete clients." };
+
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("auth_user_id")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (!clientRow) return { success: false, error: "Client not found." };
+
+  const { error: deleteRowError } = await supabase.from("clients").delete().eq("id", clientId);
+  if (deleteRowError) {
+    return { success: false, error: "Failed to delete client record." };
+  }
+
+  // Delete the row before the auth user, not after — clients.auth_user_id
+  // references auth.users with no ON DELETE clause, so deleting the auth
+  // user first would be blocked by the still-existing client row.
+  if (clientRow.auth_user_id) {
+    const admin = createAdminClient();
+    const { error: deleteAuthError } = await admin.auth.admin.deleteUser(clientRow.auth_user_id);
+    if (deleteAuthError) {
+      // Client record is already gone, matching what the UI now shows —
+      // not failing the whole operation over a leftover orphaned auth
+      // user, which is a cleanup concern rather than a user-facing one.
+      console.error("Client row deleted but auth user deletion failed:", deleteAuthError.message);
+    }
+  }
+
+  return { success: true };
+}

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { loadMessagesForClient } from "@/lib/mapDbMessages";
 import { ZAINAB_PHONE } from "@/lib/mock-data/clients";
 import { VoiceRecorder } from "@/components/client/VoiceRecorder";
 import { VoiceMessageBubble } from "@/components/client/VoiceMessageBubble";
@@ -12,7 +14,23 @@ export default function ClientChatPage() {
   const activeClientId = useAppStore((s) => s.activeClientId);
   const messages = useAppStore((s) => s.messagesByClient[activeClientId] ?? []);
   const sendMessage = useAppStore((s) => s.sendMessage);
+  const setMessagesForClient = useAppStore((s) => s.setMessagesForClient);
   const [input, setInput] = useState("");
+
+  // Loads real message history on open. Not real-time — a message sent
+  // by Zainab while this page is already open won't appear until this
+  // effect re-runs (reload/re-navigate), same limitation flagged
+  // elsewhere (e.g. the nutritionist's client detail check-in card).
+  useEffect(() => {
+    if (!activeClientId) return;
+    let cancelled = false;
+    loadMessagesForClient(activeClientId).then((msgs) => {
+      if (!cancelled) setMessagesForClient(activeClientId, msgs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClientId, setMessagesForClient]);
 
   function send() {
     if (!input.trim()) return;
@@ -20,9 +38,28 @@ export default function ClientChatPage() {
     setInput("");
   }
 
-  function sendVoice(audioUrl: string, duration: number) {
+  async function sendVoice(audioUrl: string, duration: number, blob?: Blob) {
     if (!audioUrl) return;
-    sendMessage(activeClientId, "client", { audioUrl, audioDuration: duration });
+
+    let audioStoragePath: string | undefined;
+    if (blob) {
+      const supabase = createClient();
+      const path = `${activeClientId}/${Date.now()}.webm`;
+      const { error } = await supabase.storage
+        .from("voice-notes")
+        .upload(path, blob, { contentType: "audio/webm" });
+      if (error) {
+        console.error("Failed to upload voice note:", error.message);
+      } else {
+        audioStoragePath = path;
+      }
+    }
+
+    // audioUrl (blob URL) is used for the sender's own immediate
+    // playback in this session; audioStoragePath is what actually
+    // persists — Zainab will get a signed URL from it when she loads
+    // this thread, since the blob URL itself never leaves this browser.
+    sendMessage(activeClientId, "client", { audioUrl, audioDuration: duration }, audioStoragePath);
   }
 
   return (

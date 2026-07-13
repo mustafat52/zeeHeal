@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PeriodLog, FlowIntensity } from "@/lib/mock-data/clients";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { mapDbPeriodLogRows } from "@/lib/mapDbPeriod";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, Check } from "lucide-react";
 import clsx from "clsx";
@@ -91,6 +93,35 @@ export function PeriodCalendar({
   const logPeriodStart = useAppStore((s) => s.logPeriodStart);
   const logPeriodEnd = useAppStore((s) => s.logPeriodEnd);
   const logPeriodFlow = useAppStore((s) => s.logPeriodFlow);
+  const setClientPeriodLogs = useAppStore((s) => s.setClientPeriodLogs);
+
+  // Loads real period_logs + their nested period_flow_logs on mount,
+  // converting real dates back into the relative-label PeriodLog[] shape
+  // this component (and PeriodFlowChart/PeriodFlowStrip) already expect.
+  // Nothing else in this file changes — the periodLogs prop just starts
+  // reflecting real data once the parent (PCOSHome) re-renders with the
+  // updated store value.
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+
+    async function loadPeriods() {
+      const supabase = createClient();
+      const { data: logs, error } = await supabase
+        .from("period_logs")
+        .select("*, period_flow_logs(*)")
+        .eq("client_id", clientId)
+        .order("start_date", { ascending: true });
+
+      if (cancelled || error || !logs) return;
+      setClientPeriodLogs(clientId, mapDbPeriodLogRows(logs));
+    }
+
+    loadPeriods();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, setClientPeriodLogs]);
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());

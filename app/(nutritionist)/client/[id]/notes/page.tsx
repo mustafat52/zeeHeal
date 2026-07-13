@@ -1,346 +1,191 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
-import { Pill } from "@/components/ui/Pill";
-import { Button } from "@/components/ui/Button";
-import { PrepSheetModal } from "@/components/nutritionist/PrepSheetModal";
-import { ClientProfileFormModal } from "@/components/nutritionist/ClientProfileFormModal";
-import { CycleReportModal } from "@/components/nutritionist/CycleReportModal";
-import { PlanHistoryModal } from "@/components/nutritionist/PlanHistoryModal";
-import { EditClientInfoModal } from "@/components/nutritionist/EditClientInfoModal";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
-import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History, PenLine, Pencil } from "lucide-react";
+import { ChevronLeft, Save, Plus, MessageSquareText } from "lucide-react";
 
-export default function ClientDetailPage() {
+export default function ClientNotesPage() {
   const params = useParams();
   const router = useRouter();
   const clientId = params.id as string;
   const client = useAppStore((s) => s.clients.find((c) => c.id === clientId));
-  const setCheckinConfig = useAppStore((s) => s.setCheckinConfig);
-  const renewPlanCycle = useAppStore((s) => s.renewPlanCycle);
-  const updateClientProfile = useAppStore((s) => s.updateClientProfile);
-  const archiveClient = useAppStore((s) => s.archiveClient);
-  const unarchiveClient = useAppStore((s) => s.unarchiveClient);
-  const deleteClient = useAppStore((s) => s.deleteClient);
-  const [showPrepSheet, setShowPrepSheet] = useState(false);
-  const [showProfileForm, setShowProfileForm] = useState(false);
-  const [showCycleReport, setShowCycleReport] = useState(false);
-  const [showPlanHistory, setShowPlanHistory] = useState(false);
-  const [showEditInfo, setShowEditInfo] = useState(false);
+
+  const setMonthlyRecap = useAppStore((s) => s.setMonthlyRecap);
+  const setMealReasoning = useAppStore((s) => s.setMealReasoning);
+  const addSessionNote = useAppStore((s) => s.addSessionNote);
+  const setClientNotes = useAppStore((s) => s.setClientNotes);
+
+  const [recapDraft, setRecapDraft] = useState(client?.monthlyRecap ?? "");
+  const [recapSaved, setRecapSaved] = useState(false);
+
+  const [reasoningDrafts, setReasoningDrafts] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        (client?.todayPlan.meals ?? []).map((m) => [m.id, m.reasoning ?? ""])
+      )
+  );
+  const [savedMealId, setSavedMealId] = useState<string | null>(null);
+
+  const [newNote, setNewNote] = useState("");
+  const [notesLoading, setNotesLoading] = useState(true);
+
+  // session_notes comes back empty from the dashboard/detail hydration —
+  // this page is the one that actually loads the real list.
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+
+    async function loadNotes() {
+      setNotesLoading(true);
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("session_notes")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+
+      if (cancelled) return;
+      if (!error && data) {
+        setClientNotes(
+          clientId,
+          data.map((row) => ({ date: row.note_date, text: row.text }))
+        );
+      }
+      setNotesLoading(false);
+    }
+
+    loadNotes();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, setClientNotes]);
 
   if (!client) return null;
 
-  const doneToday = client.todayPlan.meals.filter((m) => m.status === "done").length;
-  const configuredCount = Object.values(client.checkinConfig ?? {}).filter(Boolean).length;
-  const daysLeft = client.planCycle.totalDays - client.planCycle.currentDay;
-  const cycleNearEnd = daysLeft <= 3;
+  function handleSaveRecap() {
+    setMonthlyRecap(client!.id, recapDraft);
+    setRecapSaved(true);
+    setTimeout(() => setRecapSaved(false), 1500);
+  }
+
+  function handleSaveReasoning(mealId: string) {
+    // NOTE: still a no-op against real data — todayPlan.meals is an empty
+    // placeholder until the meal-generation decision lands, so this button
+    // has nothing to actually attach reasoning to yet. Left wired for the
+    // moment that unblocks.
+    setMealReasoning(client!.id, mealId, reasoningDrafts[mealId] ?? "");
+    setSavedMealId(mealId);
+    setTimeout(() => setSavedMealId(null), 1500);
+  }
+
+  function handleAddNote() {
+    if (!newNote.trim()) return;
+    addSessionNote(client!.id, newNote.trim());
+    setNewNote("");
+  }
 
   return (
-    <div className="pt-12 px-5">
+    <div className="pt-12 px-5 pb-10">
       <button onClick={() => router.back()} className="tap-scale flex items-center gap-1 text-moss-600 text-sm mb-4">
         <ChevronLeft size={16} /> Back
       </button>
 
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-14 h-14 rounded-full bg-sage-100 flex items-center justify-center font-medium text-lg text-sage-800">
-          {client.initials}
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="font-display text-xl text-moss-900">{client.name}</h1>
-            {client.archived && (
-              <span className="text-[10px] font-medium text-moss-500 bg-moss-900/5 px-2 py-0.5 rounded-full">
-                Archived
-              </span>
-            )}
-          </div>
-          <Pill tone="sage">{client.planType}</Pill>
-          <p className="text-xs text-moss-400 mt-1">{client.phone}</p>
-        </div>
-        <button
-          onClick={() => setShowEditInfo(true)}
-          className="tap-scale w-9 h-9 rounded-full bg-white border border-sage-100/60 flex items-center justify-center shrink-0"
-          aria-label="Edit client info"
-        >
-          <Pencil size={14} className="text-moss-600" />
-        </button>
-      </div>
-
-      <button
-        onClick={() => setShowCycleReport(true)}
-        className={`tap-scale w-full flex items-center gap-3 rounded-xl p-3.5 mb-2.5 ${
-          cycleNearEnd ? "bg-clay-600" : "bg-white border border-sage-100/60 shadow-card"
-        }`}
-      >
-        <div
-          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-            cycleNearEnd ? "bg-white/20" : "bg-clay-100"
-          }`}
-        >
-          <FileText size={16} className={cycleNearEnd ? "text-white" : "text-clay-600"} />
-        </div>
-        <div className="text-left flex-1">
-          <p className={`text-sm font-medium ${cycleNearEnd ? "text-white" : "text-moss-900"}`}>
-            Cycle {client.planCycle.cycleNumber} review
-          </p>
-          <p className={`text-xs ${cycleNearEnd ? "text-white/80" : "text-moss-400"}`}>
-            {cycleNearEnd
-              ? `Day ${client.planCycle.currentDay} of 15 · review due`
-              : `Day ${client.planCycle.currentDay} of 15`}
-          </p>
-        </div>
-      </button>
-
-      {client.cycleHistory && client.cycleHistory.length > 0 && (
-        <button
-          onClick={() => setShowPlanHistory(true)}
-          className="tap-scale flex items-center gap-1.5 text-xs text-moss-600 mb-5"
-        >
-          <History size={13} />
-          View past cycles ({client.cycleHistory.length})
-        </button>
-      )}
-
-      <div className="flex gap-2.5 mb-5">
-        <button
-          onClick={() => setShowPrepSheet(true)}
-          className="tap-scale flex-1 flex items-center gap-3 bg-clay-100 rounded-xl p-3.5"
-        >
-          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
-            <ClipboardList size={16} className="text-clay-600" />
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-medium text-clay-600">Prep for call</p>
-            <p className="text-xs text-clay-600/70">Quick summary</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setShowProfileForm(true)}
-          className="tap-scale flex-1 flex items-center gap-3 bg-sage-100 rounded-xl p-3.5"
-        >
-          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
-            <Settings2 size={16} className="text-sage-700" />
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-medium text-sage-800">Check-in setup</p>
-            <p className="text-xs text-sage-700/70">{configuredCount} fields on</p>
-          </div>
-        </button>
-      </div>
-
-      <button
-        onClick={() => router.push(`/client/${client.id}/notes`)}
-        className="tap-scale w-full flex items-center gap-3 bg-white border border-sage-100/60 shadow-card rounded-xl p-3.5 mb-5"
-      >
-        <div className="w-9 h-9 rounded-full bg-moss-900/5 flex items-center justify-center shrink-0">
-          <PenLine size={16} className="text-moss-600" />
-        </div>
-        <div className="text-left flex-1">
-          <p className="text-sm font-medium text-moss-900">Notes &amp; plan reasoning</p>
-          <p className="text-xs text-moss-400">Monthly note, meal reasoning, session notes</p>
-        </div>
-      </button>
-
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <Card>
-          <p className="text-xs text-moss-400">Streak</p>
-          <p className="font-display text-xl text-moss-900 mt-0.5">{client.streak} days</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-moss-400">Today&apos;s logging</p>
-          <p className="font-display text-xl text-moss-900 mt-0.5">
-            {doneToday}/{client.todayPlan.meals.length} meals
-          </p>
-        </Card>
-      </div>
-
-      {client.todayCheckin && (
-        <Card className="mb-5">
-          <p className="text-sm font-medium text-moss-600 mb-3">Today&apos;s check-in</p>
-          <div className="grid grid-cols-2 gap-3">
-            {client.todayCheckin.weight !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Weight</p>
-                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.weight} kg</p>
-              </div>
-            )}
-            {client.todayCheckin.sleepHours !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Sleep</p>
-                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.sleepHours} hrs</p>
-              </div>
-            )}
-            {client.todayCheckin.mood !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Mood</p>
-                <p className="text-sm font-medium text-moss-900">
-                  {["😞", "😕", "🙂", "😊", "🤩"][client.todayCheckin.mood - 1] ?? client.todayCheckin.mood}
-                </p>
-              </div>
-            )}
-            {client.todayCheckin.waterGlasses !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Water</p>
-                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.waterGlasses} glasses</p>
-              </div>
-            )}
-            {client.todayCheckin.bloating !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Bloating</p>
-                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.bloating}/10</p>
-              </div>
-            )}
-            {client.todayCheckin.skinCondition !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Skin condition</p>
-                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.skinCondition}/10</p>
-              </div>
-            )}
-            {client.todayCheckin.hairFall !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Hair fall</p>
-                <p className="text-sm font-medium text-moss-900">{client.todayCheckin.hairFall}/10</p>
-              </div>
-            )}
-            {client.todayCheckin.cycleDay !== undefined && (
-              <div>
-                <p className="text-xs text-moss-400">Cycle day</p>
-                <p className="text-sm font-medium text-moss-900">Day {client.todayCheckin.cycleDay}</p>
-              </div>
-            )}
-            {client.todayCheckin.activityType && client.todayCheckin.activityType !== "None" && (
-              <div>
-                <p className="text-xs text-moss-400">Activity</p>
-                <p className="text-sm font-medium text-moss-900">
-                  {client.todayCheckin.activityType} · {client.todayCheckin.activityMinutes}min
-                </p>
-              </div>
-            )}
-          </div>
-          {client.todayCheckin.note && (
-            <p className="text-xs text-moss-600 mt-3 pt-3 border-t border-sage-100 italic">
-              &quot;{client.todayCheckin.note}&quot;
-            </p>
-          )}
-        </Card>
-      )}
+      <h1 className="font-display text-2xl text-moss-900 mb-1">Notes & plan reasoning</h1>
+      <p className="text-sm text-moss-400 mb-5">{client.name}</p>
 
       <Card className="mb-5">
-        <p className="text-sm font-medium text-moss-600 mb-3">Today&apos;s meals</p>
-        <div className="flex flex-col gap-2.5">
+        <p className="text-sm font-medium text-moss-600 mb-1">Monthly note</p>
+        <p className="text-xs text-moss-400 mb-3">
+          This is what {client.name.split(" ")[0]} sees on their Progress page, styled as a personal note from you.
+        </p>
+        <textarea
+          value={recapDraft}
+          onChange={(e) => setRecapDraft(e.target.value)}
+          rows={5}
+          placeholder="Write this month's note..."
+          className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 resize-none"
+        />
+        <button
+          onClick={handleSaveRecap}
+          className="tap-scale mt-2.5 flex items-center gap-1.5 bg-sage-600 text-white rounded-xl px-4 py-2 text-xs font-medium"
+        >
+          <Save size={13} /> {recapSaved ? "Saved" : "Save note"}
+        </button>
+      </Card>
+
+      <Card className="mb-5">
+        <p className="text-sm font-medium text-moss-600 mb-1">Today&apos;s meal reasoning</p>
+        <p className="text-xs text-moss-400 mb-3">
+          Shown to {client.name.split(" ")[0]} when they tap &quot;Why did Zainab pick this?&quot; on a meal.
+        </p>
+        <div className="flex flex-col gap-4">
           {client.todayPlan.meals.map((meal) => (
-            <div key={meal.id} className="flex items-start justify-between gap-3 pb-2.5 border-b border-sage-100 last:border-0 last:pb-0">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-moss-900">{meal.label}</p>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${meal.status === "done" ? "bg-sage-100 text-sage-700" : "bg-moss-900/5 text-moss-400"}`}>
-                    {meal.status === "done" ? "Logged" : "Pending"}
-                  </span>
-                </div>
-                <p className="text-xs text-moss-400 mt-0.5">{meal.items}</p>
-                {meal.log?.note && (
-                  <p className="text-xs text-moss-600 italic mt-1.5">&quot;{meal.log.note}&quot;</p>
-                )}
-                {meal.log?.photo && (
-                  <p className="text-[10px] text-sage-600 mt-1">📷 Photo attached</p>
-                )}
-              </div>
+            <div key={meal.id} className="pb-4 border-b border-sage-100 last:border-0 last:pb-0">
+              <p className="text-sm font-medium text-moss-900">{meal.label}</p>
+              <p className="text-xs text-moss-400 mb-2">{meal.items}</p>
+              <textarea
+                value={reasoningDrafts[meal.id] ?? ""}
+                onChange={(e) =>
+                  setReasoningDrafts((prev) => ({ ...prev, [meal.id]: e.target.value }))
+                }
+                rows={3}
+                placeholder="Why did you choose this meal for them?"
+                className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 resize-none"
+              />
+              <button
+                onClick={() => handleSaveReasoning(meal.id)}
+                className="tap-scale mt-2 flex items-center gap-1.5 bg-sage-100 text-sage-800 rounded-xl px-3.5 py-1.5 text-xs font-medium"
+              >
+                <Save size={12} /> {savedMealId === meal.id ? "Saved" : "Save reasoning"}
+              </button>
             </div>
           ))}
+          {client.todayPlan.meals.length === 0 && (
+            <p className="text-xs text-moss-400 text-center py-2">
+              No meals to reason about yet — today&apos;s plan hasn&apos;t been generated.
+            </p>
+          )}
         </div>
       </Card>
 
-      <Card className="mb-5">
-        <p className="text-sm font-medium text-moss-600 mb-3">Weight trend</p>
-        <div className="h-40 -ml-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={client.progress}>
-              <XAxis dataKey="week" tick={{ fontSize: 11, fill: "#8A8F7E" }} axisLine={false} tickLine={false} />
-              <YAxis hide domain={["dataMin - 1", "dataMax + 1"]} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #EDF1E6", fontSize: 12 }} />
-              <Line type="monotone" dataKey="weight" stroke="#7C9473" strokeWidth={2.5} dot={{ fill: "#7C9473", r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
+      <Card>
+        <p className="text-sm font-medium text-moss-600 mb-3 flex items-center gap-1.5">
+          <MessageSquareText size={14} /> Session notes
+        </p>
+        <div className="flex gap-2 mb-4">
+          <input
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Add a note from today's session..."
+            className="flex-1 bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400"
+          />
+          <button
+            onClick={handleAddNote}
+            className="tap-scale w-11 h-11 rounded-xl bg-sage-600 flex items-center justify-center shrink-0"
+            aria-label="Add note"
+          >
+            <Plus size={18} className="text-white" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {notesLoading && (
+            <p className="text-xs text-moss-400 text-center py-4">Loading notes...</p>
+          )}
+          {!notesLoading &&
+            client.notes.map((note, i) => (
+              <div key={i} className="bg-white rounded-xl border border-sage-100/60 p-3">
+                <p className="text-[11px] text-moss-400 mb-0.5">{note.date}</p>
+                <p className="text-sm text-moss-900">{note.text}</p>
+              </div>
+            ))}
+          {!notesLoading && client.notes.length === 0 && (
+            <p className="text-xs text-moss-400 text-center py-4">No session notes yet.</p>
+          )}
         </div>
       </Card>
-
-      <h2 className="text-sm font-medium text-moss-600 mb-3">Session notes</h2>
-      <div className="flex flex-col gap-2.5 mb-6">
-        {client.notes.map((note, i) => (
-          <Card key={i}>
-            <p className="text-xs text-moss-400 mb-1">{note.date}</p>
-            <p className="text-sm text-moss-900">{note.text}</p>
-          </Card>
-        ))}
-      </div>
-
-      <div className="flex gap-2.5">
-        <Button variant="primary" className="flex-1" onClick={() => router.push(`/client/${client.id}/chat`)}>
-          <MessageCircle size={16} /> Message
-        </Button>
-        <a
-          href={`tel:${client.phone.replace(/\s/g, "")}`}
-          className="tap-scale flex-1 flex items-center justify-center gap-2 bg-sage-100 text-sage-800 rounded-xl py-3 text-sm font-medium"
-        >
-          <Phone size={16} /> Call
-        </a>
-      </div>
-
-      <AnimatePresence>
-        {showPrepSheet && (
-          <PrepSheetModal client={client} onClose={() => setShowPrepSheet(false)} />
-        )}
-        {showProfileForm && (
-          <ClientProfileFormModal
-            client={client}
-            onClose={() => setShowProfileForm(false)}
-            onSave={(config) => {
-              setCheckinConfig(client.id, config);
-              setShowProfileForm(false);
-            }}
-          />
-        )}
-        {showCycleReport && (
-          <CycleReportModal
-            client={client}
-            onClose={() => setShowCycleReport(false)}
-            onRenew={() => {
-              renewPlanCycle(client.id);
-              setShowCycleReport(false);
-            }}
-          />
-        )}
-        {showPlanHistory && (
-          <PlanHistoryModal client={client} onClose={() => setShowPlanHistory(false)} />
-        )}
-        {showEditInfo && (
-          <EditClientInfoModal
-            client={client}
-            onClose={() => setShowEditInfo(false)}
-            onSave={(updates) => {
-              updateClientProfile(client.id, updates);
-              setShowEditInfo(false);
-            }}
-            onArchive={() => {
-              archiveClient(client.id);
-              setShowEditInfo(false);
-            }}
-            onUnarchive={() => {
-              unarchiveClient(client.id);
-              setShowEditInfo(false);
-            }}
-            onDelete={() => {
-              deleteClient(client.id);
-              router.push("/dashboard");
-            }}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
