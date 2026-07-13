@@ -4,17 +4,21 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { mapDbMealToUiMeal } from "@/lib/mapDbMeal";
+import { enabledMealLabels } from "@/lib/mealConfig";
 import { DayPlan, MealLog } from "@/lib/mock-data/clients";
 import { LogMealModal } from "./LogMealModal";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Sun, Sunrise, Moon, Cookie, Camera, MessageSquareText } from "lucide-react";
+import { Check, Sun, Sunrise, Moon, Cookie, Coffee, Sunset, Camera, MessageSquareText } from "lucide-react";
 import clsx from "clsx";
 
 const mealIcons: Record<string, React.ElementType> = {
+  "Early Morning": Coffee,
   Breakfast: Sunrise,
+  "Mid-Morning": Cookie,
   Lunch: Sun,
-  Snack: Cookie,
+  Evening: Sunset,
   Dinner: Moon,
+  Snack: Cookie,
 };
 
 const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -95,7 +99,12 @@ export function TodayMeals({
 
       const days = client?.weeklyPlan?.days;
       const dayKey = DAY_KEYS[new Date().getDay()];
-      const todaysItems = days?.[dayKey] ?? [];
+      const rawItems = days?.[dayKey] ?? [];
+      // Safety net: only generate rows for slots this client currently
+      // has enabled, even if weeklyPlan.days has stale entries (e.g. a
+      // slot that was later turned off but never removed from the plan).
+      const enabledLabels = enabledMealLabels(client?.mealConfig);
+      const todaysItems = rawItems.filter((item) => enabledLabels.includes(item.label));
 
       if (todaysItems.length === 0) {
         setClientTodayPlan(clientId, { date: "Today", meals: [], water });

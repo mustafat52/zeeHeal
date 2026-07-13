@@ -1,3 +1,5 @@
+import type { MealConfig } from "@/lib/mealConfig";
+
 export type MealStatus = "pending" | "done";
 
 export type ConditionType = "weight-loss" | "pcos" | "hormonal" | "skincare";
@@ -125,6 +127,13 @@ export interface Client {
     templateName?: string;
     days: Record<string, { label: string; items: string }[]>;
   };
+  /**
+   * Which of the 6 possible daily meal slots (Early Morning, Breakfast,
+   * Mid-Morning, Lunch, Evening, Dinner) apply to this client — some
+   * clients get 3 meals, some 5, some all 6. Set at onboarding, editable
+   * later. Empty/undefined defaults to all 6 enabled — see lib/mealConfig.ts.
+   */
+  mealConfig?: MealConfig;
   /** Archived record of every completed cycle, oldest first. */
   cycleHistory?: CycleSnapshot[];
   goalWeight?: number;

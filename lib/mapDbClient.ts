@@ -31,6 +31,7 @@ export function mapDbClientToStoreClient(row: any): Client {
     goalWeight: row.goal_weight ?? undefined,
     monthlyRecap: row.monthly_recap ?? undefined,
     checkinConfig: row.checkin_config ?? {},
+    mealConfig: row.meal_config ?? {},
     weeklyPlan: row.weekly_plan_days
       ? {
           templateId: row.weekly_plan_template_id ?? undefined,

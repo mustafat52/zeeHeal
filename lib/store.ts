@@ -6,6 +6,7 @@ import { getPcosPhase } from "./conditionSummaries";
 import { createClient } from "./supabase/client";
 import { deleteClientAccount } from "@/app/actions/clients";
 import { relativeLabelToISODate } from "./periodDateLabels";
+import { reconcileWeekWithConfig } from "./mealConfig";
 
 /** Today's date as YYYY-MM-DD, matching daily_checkins.checkin_date. */
 function todayDateString() {
@@ -99,7 +100,7 @@ interface AppState {
   addSessionNote: (clientId: string, text: string) => void;
   updateClientProfile: (
     clientId: string,
-    updates: Partial<Pick<Client, "name" | "initials" | "phone" | "condition" | "planType" | "goalWeight" | "programDurationMonths">>
+    updates: Partial<Pick<Client, "name" | "initials" | "phone" | "condition" | "planType" | "goalWeight" | "programDurationMonths" | "mealConfig">>
   ) => void;
   archiveClient: (clientId: string) => void;
   unarchiveClient: (clientId: string) => void;
@@ -525,6 +526,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (updates.planType !== undefined) dbUpdates.plan_type = updates.planType;
     if (updates.goalWeight !== undefined) dbUpdates.goal_weight = updates.goalWeight;
     if (updates.programDurationMonths !== undefined) dbUpdates.program_duration_months = updates.programDurationMonths;
+    if (updates.mealConfig !== undefined) dbUpdates.meal_config = updates.mealConfig;
 
     // NOTE: updating `phone` here only changes the display column. The
     // client's actual login credential is a synthetic email derived from
@@ -649,7 +651,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           if (phase) sourceDays = pcosPhaseStarterMeals[phase.key];
         }
 
-        const forkedDays: WeeklyMeals = JSON.parse(JSON.stringify(sourceDays)); // deep clone — never share references with the template
+        const forkedDays: WeeklyMeals = reconcileWeekWithConfig(
+          JSON.parse(JSON.stringify(sourceDays)), // deep clone — never share references with the template
+          c.mealConfig
+        );
         clonedDays = forkedDays;
 
         return {

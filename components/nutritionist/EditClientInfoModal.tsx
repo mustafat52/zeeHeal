@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Client, ConditionType } from "@/lib/mock-data/clients";
+import { MEAL_SLOTS, MealConfig, MealSlotKey } from "@/lib/mealConfig";
 import { X, Save, Archive, ArchiveRestore, Trash2, AlertTriangle } from "lucide-react";
 import clsx from "clsx";
 
@@ -47,10 +48,23 @@ export function EditClientInfoModal({
   const [programDurationMonths, setProgramDurationMonths] = useState<number | null>(
     client.programDurationMonths ?? null
   );
+  // Defaults to Breakfast/Lunch/Dinner on if this client has no config
+  // saved yet — mirrors the same "empty means show the classic 3"
+  // default used at creation time in NewClientFormModal.
+  const [mealConfig, setMealConfig] = useState<MealConfig>(
+    client.mealConfig && Object.keys(client.mealConfig).length > 0
+      ? client.mealConfig
+      : { earlyMorning: false, breakfast: true, midMorning: false, lunch: true, evening: false, dinner: true }
+  );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const canSave = name.trim().length > 0 && phone.trim().length > 0;
   const conditionChanged = condition !== client.condition;
+  const phoneChanged = phone.trim() !== client.phone;
+
+  function toggleMealSlot(key: MealSlotKey) {
+    setMealConfig((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
 
   function handleSave() {
     if (!canSave) return;
@@ -62,6 +76,7 @@ export function EditClientInfoModal({
       planType: planType.trim() || client.planType,
       goalWeight: condition === "weight-loss" ? goalWeight ?? undefined : client.goalWeight,
       programDurationMonths: programDurationMonths ?? undefined,
+      mealConfig,
     });
   }
 
@@ -98,8 +113,14 @@ export function EditClientInfoModal({
           onChange={(e) => setPhone(e.target.value)}
           placeholder="Phone number"
           type="tel"
-          className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-5"
+          className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-2.5"
         />
+        {phoneChanged && (
+          <p className="text-[11px] text-clay-600 mb-4">
+            Changing this only updates their displayed number — their login is tied to the phone number used when their account was created and won&apos;t change. Changing it here will make their existing passcode stop matching what&apos;s shown for them.
+          </p>
+        )}
+        {!phoneChanged && <div className="mb-2.5" />}
 
         <p className="text-xs font-medium text-moss-600 mb-2">Condition</p>
         <div className="flex flex-wrap gap-2 mb-2">
@@ -144,6 +165,30 @@ export function EditClientInfoModal({
             />
           </>
         )}
+
+        <p className="text-xs font-medium text-moss-600 mb-1.5">Which meals do they log?</p>
+        <p className="text-[11px] text-moss-400 mb-2.5">
+          Changing this reshapes their weekly plan editor immediately — newly enabled slots show up blank, ready to fill in; disabled slots are removed from the editor (their content isn&apos;t lost from today&apos;s already-generated meals, just from future days).
+        </p>
+        <div className="flex flex-wrap gap-2 mb-6">
+          {MEAL_SLOTS.map((slot) => {
+            const active = !!mealConfig[slot.key];
+            return (
+              <button
+                key={slot.key}
+                onClick={() => toggleMealSlot(slot.key)}
+                className={clsx(
+                  "tap-scale px-3 py-1.5 rounded-full text-xs font-medium border",
+                  active
+                    ? "bg-sage-600 text-white border-sage-600"
+                    : "bg-white text-moss-600 border-sage-100"
+                )}
+              >
+                {slot.label}
+              </button>
+            );
+          })}
+        </div>
 
         <p className="text-xs font-medium text-moss-600 mb-2">Program length</p>
         <div className="flex flex-wrap gap-2 mb-2.5">

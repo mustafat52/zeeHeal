@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Client, ConditionType, CHECKIN_FIELDS, CheckinConfig, CheckinFieldKey } from "@/lib/mock-data/clients";
 import { createClientAccount } from "@/app/actions/clients";
 import { mapDbClientToStoreClient } from "@/lib/mapDbClient";
+import { MEAL_SLOTS, MealConfig, MealSlotKey } from "@/lib/mealConfig";
 import clsx from "clsx";
 
 const presets: { label: string; planType: string; condition: ConditionType; keys: CheckinFieldKey[] }[] = [
@@ -59,6 +60,14 @@ export function NewClientFormModal({
   const [planType, setPlanType] = useState("");
   const [condition, setCondition] = useState<ConditionType>("weight-loss");
   const [config, setConfig] = useState<CheckinConfig>({});
+  const [mealConfig, setMealConfig] = useState<MealConfig>({
+    earlyMorning: false,
+    breakfast: true,
+    midMorning: false,
+    lunch: true,
+    evening: false,
+    dinner: true,
+  });
   const [programDurationMonths, setProgramDurationMonths] = useState<number | null>(null);
   const [customPasscode, setCustomPasscode] = useState("");
 
@@ -69,6 +78,10 @@ export function NewClientFormModal({
 
   function toggle(key: CheckinFieldKey) {
     setConfig((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function toggleMealSlot(key: MealSlotKey) {
+    setMealConfig((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   function applyPreset(preset: { planType: string; condition: ConditionType; keys: CheckinFieldKey[] }) {
@@ -95,6 +108,7 @@ export function NewClientFormModal({
       planType: planType.trim() || "General nutrition",
       programDurationMonths,
       checkinConfig: config,
+      mealConfig,
       customPasscode: customPasscode.trim() || undefined,
     });
 
@@ -266,6 +280,30 @@ export function NewClientFormModal({
               placeholder="Or enter a custom number of months"
               className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-5"
             />
+
+            <p className="text-xs font-medium text-moss-600 mb-1.5">Which meals will they log?</p>
+            <p className="text-[11px] text-moss-400 mb-2.5">
+              Not everyone needs all 6 — pick what fits this client. Breakfast, lunch, and dinner are on by default.
+            </p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {MEAL_SLOTS.map((slot) => {
+                const active = !!mealConfig[slot.key];
+                return (
+                  <button
+                    key={slot.key}
+                    onClick={() => toggleMealSlot(slot.key)}
+                    className={clsx(
+                      "tap-scale px-3 py-1.5 rounded-full text-xs font-medium border",
+                      active
+                        ? "bg-sage-600 text-white border-sage-600"
+                        : "bg-white text-moss-600 border-sage-100"
+                    )}
+                  >
+                    {slot.label}
+                  </button>
+                );
+              })}
+            </div>
 
             <p className="text-xs font-medium text-moss-600 mb-2">
               What should they log every day?

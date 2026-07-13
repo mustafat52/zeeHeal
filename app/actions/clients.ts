@@ -4,6 +4,7 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizePhoneForAuth, phoneToSyntheticEmail } from "@/lib/phone";
 import type { ConditionType, CheckinConfig } from "@/lib/mock-data/clients";
+import type { MealConfig } from "@/lib/mealConfig";
 
 function generatePasscode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -21,6 +22,7 @@ export async function createClientAccount(input: {
   planType: string;
   programDurationMonths?: number | null;
   checkinConfig: CheckinConfig;
+  mealConfig?: MealConfig;
   customPasscode?: string;
 }): Promise<CreateClientResult> {
   // Auth check happens against the cookie-bound, RLS-respecting server
@@ -84,6 +86,7 @@ export async function createClientAccount(input: {
       plan_type: input.planType || "General nutrition",
       program_duration_months: input.programDurationMonths ?? null,
       checkin_config: input.checkinConfig,
+      meal_config: input.mealConfig ?? {},
     })
     .select()
     .single();
