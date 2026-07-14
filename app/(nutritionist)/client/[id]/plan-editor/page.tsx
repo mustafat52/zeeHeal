@@ -3,19 +3,11 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { blankWeekForConfig, reconcileWeekWithConfig } from "@/lib/mealConfig";
 import { ChevronLeft, Save } from "lucide-react";
 import clsx from "clsx";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const defaultMealLabels = ["Breakfast", "Lunch", "Dinner"];
-
-function blankWeek(): Record<string, { label: string; items: string }[]> {
-  const week: Record<string, { label: string; items: string }[]> = {};
-  for (const day of days) {
-    week[day] = defaultMealLabels.map((label) => ({ label, items: "" }));
-  }
-  return week;
-}
 
 export default function ClientPlanEditorPage() {
   const params = useParams();
@@ -25,7 +17,15 @@ export default function ClientPlanEditorPage() {
   const setClientWeeklyPlan = useAppStore((s) => s.setClientWeeklyPlan);
 
   const [activeDay, setActiveDay] = useState("Mon");
-  const [draft, setDraft] = useState(() => client?.weeklyPlan?.days ?? blankWeek());
+  // Reconciled against this client's enabled meal slots regardless of
+  // source — an existing plan gets any newly-enabled slots added blank,
+  // and any since-disabled slots dropped. A client with no plan yet gets
+  // a blank week containing exactly their enabled slots.
+  const [draft, setDraft] = useState(() =>
+    client?.weeklyPlan?.days
+      ? reconcileWeekWithConfig(client.weeklyPlan.days, client.mealConfig)
+      : blankWeekForConfig(client?.mealConfig)
+  );
   const [dirtyDays, setDirtyDays] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState(false);
 
@@ -92,6 +92,11 @@ export default function ClientPlanEditorPage() {
             />
           </div>
         ))}
+        {draft[activeDay]?.length === 0 && (
+          <p className="text-xs text-moss-400 text-center py-6">
+            No meal slots enabled for this client.
+          </p>
+        )}
       </div>
 
       <button
