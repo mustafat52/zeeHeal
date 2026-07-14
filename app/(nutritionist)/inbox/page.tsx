@@ -1,15 +1,67 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Mic, Phone } from "lucide-react";
 
 export default function InboxPage() {
   const clients = useAppStore((s) => s.clients);
   const messagesByClient = useAppStore((s) => s.messagesByClient);
+  const setMessagesForClient = useAppStore((s) => s.setMessagesForClient);
 
   const activeClients = clients.filter((c) => !c.archived);
+
+  // messagesByClient only gets populated for a given client once someone
+  // actually opens THAT specific chat thread — Inbox needs a preview for
+  // every client regardless, so it does its own lightweight fetch here
+  // (one query, most recent row per client, no signed URL generation
+  // since a preview never needs to actually play the audio).
+  useEffect(() => {
+    const ids = activeClients.map((c) => c.id);
+    if (ids.length === 0) return;
+    let cancelled = false;
+
+    async function loadPreviews() {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .in("client_id", ids)
+        .order("sent_at", { ascending: false });
+
+      if (cancelled || error || !data) return;
+
+      const latestByClient: Record<string, any> = {};
+      for (const row of data) {
+        if (!latestByClient[row.client_id]) latestByClient[row.client_id] = row;
+      }
+
+      for (const [clientId, row] of Object.entries(latestByClient)) {
+        setMessagesForClient(clientId, [
+          {
+            id: row.id,
+            sender: row.sender,
+            text: row.text ?? "",
+            time: new Date(row.sent_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+            audioDuration: row.audio_duration ?? undefined,
+            // audioUrl intentionally omitted here — this preview only
+            // needs to know IF it's a voice note (via audioDuration) to
+            // show the mic icon, not actually play it. The real signed
+            // URL gets generated once the client opens that thread.
+          },
+        ]);
+      }
+    }
+
+    loadPreviews();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClients.map((c) => c.id).join(",")]);
 
   return (
     <div>

@@ -25,10 +25,6 @@ function blankWeek(): Record<string, { label: string; items: string }[]> {
   return week;
 }
 
-function slugify(name: string) {
-  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "template";
-}
-
 export default function PlanTemplateEditorPage() {
   const params = useParams();
   const router = useRouter();
@@ -68,7 +64,9 @@ export default function PlanTemplateEditorPage() {
     if (!canSave) return;
     if (isNew) {
       addPlanTemplate({
-        id: slugify(name) + "-" + Date.now().toString().slice(-4),
+        // Must be a real UUID — plan_templates.id is a uuid column.
+        // crypto.randomUUID() is available in all modern browsers.
+        id: crypto.randomUUID(),
         name: name.trim(),
         tag: tag.trim() || "Ongoing",
         description: description.trim(),

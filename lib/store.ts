@@ -133,6 +133,7 @@ interface AppState {
    * client who already has their own copy.
    */
   planTemplates: PlanTemplate[];
+  setPlanTemplates: (templates: PlanTemplate[]) => void;
   addPlanTemplate: (template: PlanTemplate) => void;
   updatePlanTemplate: (templateId: string, updates: Partial<PlanTemplate>) => void;
   deletePlanTemplate: (templateId: string) => void;
@@ -720,18 +721,79 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   planTemplates: initialPlanTemplates,
 
-  addPlanTemplate: (template) =>
-    set((state) => ({ planTemplates: [...state.planTemplates, template] })),
+  setPlanTemplates: (templates) => set({ planTemplates: templates }),
 
-  updatePlanTemplate: (templateId, updates) =>
+  addPlanTemplate: (template) => {
+    set((state) => ({ planTemplates: [...state.planTemplates, template] }));
+
+    (async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        console.error("Failed to save plan template: not logged in");
+        return;
+      }
+      const { data: nutritionistRow } = await supabase
+        .from("nutritionists")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!nutritionistRow) {
+        console.error("Failed to save plan template: not the nutritionist account");
+        return;
+      }
+
+      const { error } = await supabase.from("plan_templates").insert({
+        id: template.id,
+        nutritionist_id: nutritionistRow.id,
+        name: template.name,
+        tag: template.tag,
+        description: template.description,
+        condition: template.condition,
+        weekly_meals: template.weeklyMeals,
+      });
+      if (error) console.error("Failed to save plan template:", error.message);
+    })();
+  },
+
+  updatePlanTemplate: (templateId, updates) => {
     set((state) => ({
       planTemplates: state.planTemplates.map((t) =>
         t.id === templateId ? { ...t, ...updates } : t
       ),
-    })),
+    }));
 
-  deletePlanTemplate: (templateId) =>
+    const dbUpdates: Record<string, any> = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.tag !== undefined) dbUpdates.tag = updates.tag;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.condition !== undefined) dbUpdates.condition = updates.condition;
+    if (updates.weeklyMeals !== undefined) dbUpdates.weekly_meals = updates.weeklyMeals;
+
+    const supabase = createClient();
+    supabase
+      .from("plan_templates")
+      .update(dbUpdates)
+      .eq("id", templateId)
+      .then(({ error }) => {
+        if (error) console.error("Failed to update plan template:", error.message);
+      });
+  },
+
+  deletePlanTemplate: (templateId) => {
     set((state) => ({
       planTemplates: state.planTemplates.filter((t) => t.id !== templateId),
-    })),
+    }));
+
+    const supabase = createClient();
+    supabase
+      .from("plan_templates")
+      .delete()
+      .eq("id", templateId)
+      .then(({ error }) => {
+        if (error) console.error("Failed to delete plan template:", error.message);
+      });
+  },
 }));
