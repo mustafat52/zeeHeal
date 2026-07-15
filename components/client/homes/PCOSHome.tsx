@@ -2,6 +2,7 @@
 
 import { Client } from "@/lib/mock-data/clients";
 import { useAppStore } from "@/lib/store";
+import { getTimeBasedGreeting } from "@/lib/greetings";
 import { PlanCycleBar } from "../PlanCycleBar";
 import { TodayMeals } from "../TodayMeals";
 import { CheckinCard } from "../CheckinCard";
@@ -20,7 +21,7 @@ export function PCOSHome({ client }: { client: Client }) {
       <div className="bg-rose-50 px-6 pt-12 pb-6 rounded-b-[28px]">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-rose-800 text-sm">Good morning, {client.name.split(" ")[0]}</p>
+            <p className="text-rose-800 text-sm">{getTimeBasedGreeting()}, {client.name.split(" ")[0]}</p>
             <h1 className="font-display text-2xl text-moss-900 mt-0.5">PCOS care plan</h1>
           </div>
           <LogoutButton className="mt-1" />

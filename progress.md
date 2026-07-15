@@ -1813,3 +1813,295 @@ supabase/0004_storage_policies.sql
 4. Per-page real data wiring, each still a placeholder from the login bridge: `todayPlan` (needs `meals` query + the still-open "how do daily meal rows get generated" decision), `progress` (needs `progress_weekly` view query), `checkinHistory`/`todayCheckin` (needs `daily_checkins` query), `periodLogs` (needs `period_logs`/`period_flow_logs` query), `cycleHistory` (needs `cycle_history` query)
 5. `npm audit` showed 7 vulnerabilities (1 moderate, 5 high, 1 critical) — deferred, not run with `--force`; worth a real look post-beta
 6. Timeline: beta target is July 12 — 2 days out as of this session
+
+## Session 14 — Backend wiring: account creation, auth pivot, full data-layer wiring
+
+### Summary of what was done this session
+Starting from account creation (the piece that makes login end-to-end testable), this session went on to wire essentially every remaining piece of the app to real Supabase data: client onboarding, daily check-ins, meals, session notes, progress charts, period tracking, chat, plan templates, per-client meal configuration, and finally a full audit-and-fix pass on session-hydration architecture that was causing mock data to reappear on refresh. A live debugging session also forced a pivot away from Supabase's Phone auth provider (blocked by a Twilio requirement) to synthetic-email-based auth. One confirmed file-path mixup was found and fixed (`client/[id]/page.tsx` had been overwritten with plan-editor content), and a full audit prompt was produced for a separate review pass given the volume of changes.
+
+---
+
+### Account creation & auth (initial pass)
+
+**`lib/mapDbClient.ts` — New file**
+Extracted `mapDbClientToStoreClient` out of the login page into its own module — shared bridge mapper (DB row → `Client` shape), used by login, account creation, and later the dashboard/hydrators.
+
+**`app/actions/clients.ts` — New file**
+Server Action `createClientAccount`: creates a pre-confirmed auth account + linked `clients` row, using the admin client. Originally phone-based.
+
+**`app/login/page.tsx` — Updated**
+Switched to import `mapDbClientToStoreClient` from the shared file instead of a local copy.
+
+**`components/nutritionist/NewClientFormModal.tsx` — Updated**
+Added the async account-creation flow: calls `createClientAccount`, then shows a one-time passcode-reveal screen (copy button, "you won't see this again" warning) before closing.
+
+---
+
+### Auth pivot: phone → synthetic email
+
+A live debugging session (bad API key error → publishable key format → browser extensions → service worker theory → finally: Supabase's Phone provider was simply disabled, and enabling it requires configuring Twilio even for password-only, no-OTP usage) led to abandoning Phone auth entirely.
+
+**`lib/phone.ts` — Updated**
+Added `phoneToSyntheticEmail` — converts a normalized phone number into a synthetic, never-delivered email (`{phone}@zeeheal-app.local`) used as the actual Supabase Auth identifier.
+
+**`app/login/page.tsx` — Updated**
+`signInWithPassword` now uses the synthetic email instead of `phone`.
+
+**`app/actions/clients.ts` — Updated**
+`createClientAccount` now uses `email` + `email_confirm: true` instead of `phone` + `phone_confirm: true`.
+
+**`scripts/create-nutritionist.mjs` — New file, then updated**
+One-time script to create Zainab's real account directly (the Supabase dashboard's "Create user" form has no phone field). First written for phone auth, then updated to match the synthetic-email pivot.
+
+**Manual step:** Zainab's stale phone-based auth user + `nutritionists` row deleted via SQL Editor, recreated correctly via the updated script.
+
+---
+
+### Custom passcode + welcome screen polish
+
+**`components/nutritionist/NewClientFormModal.tsx` — Updated**
+Added an optional custom-passcode input (blank = auto-generate, filled = her own choice, min 4 digits, validated both client- and server-side).
+
+**`app/actions/clients.ts` — Updated**
+Accepts and uses `customPasscode` if provided, falling back to auto-generation.
+
+**`components/ui/WelcomeTransition.tsx` — Updated**
+Added a condition-aware icon (Scale/Flower2/Leaf/Sparkles per condition) and a soft pulsing glow ring, backward-compatible with the nutritionist's welcome screen (which passes no condition).
+
+**`app/login/page.tsx` — Updated**
+Threads the client's real `condition` through to `WelcomeTransition`.
+
+---
+
+### Dashboard client list
+
+**`lib/store.ts` — Updated**
+Added `setClients` bulk-replace hydration action.
+
+**Dashboard page — Updated (initially at the wrong path, corrected later this session)**
+Fetches real client list from Supabase on mount, replacing the mock 4 personas; loading and error states added.
+
+---
+
+### Daily check-ins
+
+**`lib/store.ts` — Updated**
+`logCheckin` and `addWater` now persist to `daily_checkins` (upsert by `client_id` + `checkin_date`) alongside their existing local optimistic updates.
+
+**`lib/mapDbCheckin.ts` — New file**
+Maps a `daily_checkins` row → `DailyCheckin`.
+
+**`app/(nutritionist)/client/[id]/page.tsx` — Updated**
+Added a fetch effect loading today's real check-in for Zainab's view (`setClientTodayCheckin` hydration action added to `store.ts`).
+
+---
+
+### Session notes
+
+**`lib/store.ts` — Updated**
+`setMonthlyRecap` and `addSessionNote` now persist to `clients.monthly_recap` and `session_notes` respectively. Added `setClientNotes` hydration action.
+
+**`app/(nutritionist)/client/[id]/notes/page.tsx` — Updated**
+Loads real session notes on mount instead of reading permanently-empty `client.notes`.
+
+---
+
+### Meals
+
+**`lib/mapDbMeal.ts` — New file**
+Maps a `meals` row → the UI meal shape (`log.photo` deliberately left undefined — no signed-URL generation for previously-logged photos, flagged as an open gap).
+
+**`lib/store.ts` — Updated**
+Added `setClientTodayPlan` / `setClientTodayWater` hydration actions. `logMeal` extended with an optional `photoStoragePath` param and now persists status/note/photo-path/timestamp to the `meals` table.
+
+**`components/client/LogMealModal.tsx` — Updated**
+`onSave` now also passes the raw `File` object (needed for real Storage upload).
+
+**`components/client/TodayMeals.tsx` — Updated**
+On mount: loads today's real `meals` rows if they exist, or generates them from the client's `weeklyPlan.days` for the current weekday and inserts them; syncs the water counter from `daily_checkins`; uploads photos to the `meal-photos` bucket on log.
+
+---
+
+### "Wire everything simultaneously" batch — profile & plan management
+
+**`app/actions/clients.ts` — Updated**
+Added `deleteClientAccount` Server Action (deletes the `clients` row, then the auth user — in that order, due to the FK).
+
+**`lib/store.ts` — Updated**
+- `setCheckinConfig` — fixed a gap where it was never actually persisting (only updated local state)
+- `renewPlanCycle` — fixed to actually call the `renew_plan_cycle` RPC (previously still doing cycle math purely locally, despite the RPC existing since the very first backend session)
+- `updateClientProfile`, `archiveClient`, `unarchiveClient` — now persist
+- `deleteClient` — now calls the new `deleteClientAccount` Server Action
+- `assignPlanToClient`, `setClientWeeklyPlan` — now persist to `clients.weekly_plan_*` columns
+- Fixed a real TypeScript bug in `assignPlanToClient` (a nullable variable used directly where a non-null type was required)
+
+No changes needed to `EditClientInfoModal.tsx`, the plan-editor page, or `AssignPlanModal.tsx` — all already called these actions with the correct signatures.
+
+---
+
+### Progress charts
+
+**`lib/mapDbProgress.ts` — New file**
+`mapProgressWeeklyRows` (view rows → `ProgressPoint[]`) and `buildCheckinHistoryFromRows` (rebuilds the mock's 15-slot-per-cycle-day array from real `daily_checkins` rows).
+
+**`lib/store.ts` — Updated**
+Added `setClientProgress` / `setClientCheckinHistory` hydration actions.
+
+**`app/(client)/progress/page.tsx` — Updated**
+Fetches `progress_weekly` + `daily_checkins` on mount. Added a guard against crashing on a brand-new client with zero check-ins (the mock always had ≥1 entry; real data can have zero).
+
+---
+
+### Period tracking (PCOS)
+
+**`lib/periodDateLabels.ts` — New file**
+`relativeLabelToISODate` / `isoDateToRelativeLabel` — conversion boundary so the existing relative-label-based UI (`PeriodCalendar.tsx`, `PeriodFlowChart.tsx`, `PeriodFlowStrip.tsx`) never needed rewriting.
+
+**`lib/store.ts` — Updated**
+`logPeriodStart`, `logPeriodEnd`, `logPeriodFlow` now persist to `period_logs`/`period_flow_logs`. Added `setClientPeriodLogs` hydration action.
+
+**`components/client/PeriodCalendar.tsx` — Updated**
+Added a load effect fetching real period data on mount.
+
+**`lib/mapDbPeriod.ts` — New file**
+Extracted the period-log-row mapper into its own file, shared between `PeriodCalendar.tsx` and `ClientDetailPage`.
+
+**`app/(nutritionist)/client/[id]/page.tsx` — Updated**
+Added a `periodLogs` fetch (PCOS clients only) and a `checkinHistory` fetch (all clients) — both previously only ever populated on the client's own side, meaning Zainab's Cycle Report charts were silently empty until these were added.
+
+**`components/nutritionist/CycleReportModal.tsx` — Updated**
+Fixed a real date-format bug: `client.planCycle.startDate` is a real ISO date, but `buildFlowDataForCycle` (in `lib/period.ts`, left untouched and correct) expects the old relative-label format — now converted at the call site.
+
+---
+
+### Chat
+
+**`lib/mapDbMessages.ts` — New file**
+`loadMessagesForClient` — fetches full message history, generates signed URLs for voice notes from the private `voice-notes` bucket.
+
+**`lib/store.ts` — Updated**
+`sendMessage` extended with an optional `audioStoragePath` param, now persists to the `messages` table. Added `setMessagesForClient` hydration action.
+
+**`components/client/VoiceRecorder.tsx` — Updated**
+`onRecorded` now also passes the raw `Blob` (needed for real upload).
+
+**`app/(client)/chat/page.tsx` and `app/(nutritionist)/client/[id]/chat/page.tsx` — Updated**
+Both load real message history on mount and upload voice notes to Storage before sending.
+
+---
+
+### Per-client meal slot configuration (new feature)
+
+**`supabase/migrations/0005_meal_config.sql` — New file**
+Adds `meal_config jsonb` to `clients`.
+
+**`lib/mealConfig.ts` — New file**
+`MEAL_SLOTS` (Early Morning, Breakfast, Mid-Morning, Lunch, Evening, Dinner), `MealConfig` type, `blankWeekForConfig`, `reconcileWeekWithConfig`.
+
+**`lib/mock-data/clients.ts` — Updated**
+Added `mealConfig?: MealConfig` to the `Client` type.
+
+**`lib/mapDbClient.ts` — Updated**
+Maps `meal_config` → `mealConfig`.
+
+**`components/nutritionist/NewClientFormModal.tsx` — Updated**
+Added meal slot toggle UI (default: Breakfast/Lunch/Dinner on, others off).
+
+**`app/actions/clients.ts` — Updated**
+Accepts and persists `mealConfig` at creation.
+
+**`app/(nutritionist)/client/[id]/plan-editor/page.tsx` — Updated**
+Fully dynamic meal slots per client (was hardcoded to 3 fixed slots).
+
+**`components/client/TodayMeals.tsx` — Updated**
+Filters generated meals to only the client's currently-enabled slots (safety net against stale plan data).
+
+**`lib/store.ts` — Updated**
+`assignPlanToClient` now reconciles the forked template against the client's enabled slots before storing/persisting.
+
+**`lib/store.ts` / `components/nutritionist/EditClientInfoModal.tsx` — Updated (follow-up)**
+`updateClientProfile`'s type extended to include `mealConfig`; meal slot toggles added to the edit form so an existing client's config can be changed after onboarding, not just at creation.
+
+---
+
+### Major architecture fix: session hydration / mock-data-on-refresh bug
+
+Root cause: Zustand's hardcoded mock defaults reset on every full page refresh, and nothing was re-establishing the real session except the one-time login action.
+
+**`components/client/ClientSessionHydrator.tsx` — New file**
+Runs on every `(client)` layout mount, re-fetches the real client (+ today's check-in, added in a later fix this session), gates rendering of `children` until done.
+
+**`components/nutritionist/NutritionistSessionHydrator.tsx` — New file**
+Same idea for the nutritionist side — fetches real `clients` (and later, `planTemplates`), gates rendering.
+
+**`app/(client)/layout.tsx` and `app/(nutritionist)/layout.tsx` — Updated**
+Converted from purely presentational to Server Components: check auth server-side, `redirect("/login")` if none — this is what actually blocks direct unauthenticated access to any route in either group. Wrap `children` in the respective hydrator.
+
+**Discovered mid-fix:** `app/(nutritionist)/page.tsx` (created earlier this session under a wrong path assumption) is dead code — the real dashboard route is `app/(nutritionist)/dashboard/page.tsx`, meaning several turns of earlier dashboard-specific wiring had been landing on an unused file. Confirmed via the user's actual folder structure; the dashboard page itself needed no further changes once the layout-level fix was in place.
+
+---
+
+### Plan templates — real persistence (previously entirely unwired)
+
+**`lib/mapDbPlanTemplate.ts` — New file**
+Maps a `plan_templates` row → `PlanTemplate`.
+
+**`lib/store.ts` — Updated**
+Added `setPlanTemplates`. `addPlanTemplate`/`updatePlanTemplate`/`deletePlanTemplate` now persist for real (previously silently mock-only for the entire session up to this point).
+
+**`app/(nutritionist)/plan-builder/[templateId]/page.tsx` — Updated**
+Fixed template ID generation from a slug string to `crypto.randomUUID()` — the old scheme would have hard-failed the first real insert, since `plan_templates.id` is a `uuid` column.
+
+**`supabase/migrations/0006_seed_plan_templates.sql` — New file**
+Seeds the 4 original starter templates into the real table — without this, they would have silently disappeared the moment real `planTemplates` hydration went live.
+
+**`components/nutritionist/NutritionistSessionHydrator.tsx` — Updated**
+Extended to also fetch `plan_templates` alongside `clients`.
+
+**`app/(nutritionist)/inbox/page.tsx` — Updated**
+Added its own last-message-per-client preview fetch — previously relied on `messagesByClient` being populated by visiting each thread individually, which the Inbox list itself never triggered.
+
+---
+
+### Hydrator loading-gate refinement
+
+**`components/client/ClientSessionHydrator.tsx` and `components/nutritionist/NutritionistSessionHydrator.tsx` — Updated**
+Both changed to accept and wrap `children`, rendering a loading state until hydration completes — closes a remaining flicker where mock data could render for one frame before being replaced.
+
+**`app/(client)/layout.tsx` and `app/(nutritionist)/layout.tsx` — Updated**
+Updated to pass `children` into the hydrator components instead of rendering them as siblings.
+
+---
+
+### Bug fixes from live testing
+
+**`lib/greeting.ts` — New file**
+`getTimeBasedGreeting()` — real time-of-day greeting.
+
+**`components/client/homes/WeightLossHome.tsx`, `PCOSHome.tsx`, `HormonalHome.tsx`, `SkincareHome.tsx` — Updated**
+Replaced hardcoded "Good morning" text with the real greeting helper.
+
+**`components/client/ClientSessionHydrator.tsx` — Updated**
+Fixed a real bug: a client's check-in would appear immediately after logging (local optimistic update) then vanish on refresh, because the hydrator's re-fetch had no logic to bring `todayCheckin` back. Now fetches today's real check-in and merges it in before hydrating.
+
+**Diagnosed via console screenshot (no JS error found):** clicking a client's row from the dashboard was landing on plan-editor content instead of the detail page — traced to `app/(nutritionist)/client/[id]/page.tsx` having been overwritten with `ClientPlanEditorPage`'s code at some point. Confirmed via the user pasting the file's actual contents.
+
+**`app/(nutritionist)/client/[id]/page.tsx` — Re-sent**
+The correct `ClientDetailPage` content (with the check-in/period/history fetch effects from earlier this session) re-delivered for that exact path.
+
+---
+
+### Audit prompt produced
+
+**`zeeheal-audit-prompt.md` — New file (deliverable, not part of the app)**
+A full system-overview + file-manifest + known-gaps document, written for a separate Claude session to do a systematic file-by-file review given the volume of changes made across this session — specifically to catch any other instance of the file-path-mixup bug pattern, plus several explicitly-flagged unreviewed files and known gaps (notably: `cycleHistory` likely never fetched from the real table on load; meal photo thumbnails don't re-render after reload; `energy` field has no UI capture anywhere).
+
+---
+
+### What's next
+1. Run the audit prompt in a fresh session and act on its findings
+2. Confirm `client/[id]/plan-editor/page.tsx` still has its correct content (not swapped in the same incident)
+3. Wire `cycleHistory` fetch on the nutritionist side (flagged, not yet fixed)
+4. Signed-URL generation for previously-logged meal/skin photos
+5. Decide whether to add an `energy` input to the check-in modal or leave that column permanently unused
+6. Several nutritionist-side components were never directly reviewed this session (`DigestCard`, `PatientProfileCard`, `DailyBarStrip`, `PrepSheetModal`, `ClientProfileFormModal`, `PlanHistoryModal`, `NutritionistBottomNav`) and several client-side ones (`CheckinCard`, `PlanCycleBar`, `ActivityBarStrip`, `ClientBottomNav`) — covered by the audit prompt, not yet actioned

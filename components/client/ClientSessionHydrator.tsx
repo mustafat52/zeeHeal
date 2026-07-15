@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { mapDbCheckinToDailyCheckin } from "@/lib/mapDbCheckin";
 import type { Client } from "@/lib/mock-data/clients";
 
 /**
@@ -33,10 +35,42 @@ export function ClientSessionHydrator({
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setClients([client]);
-    setActiveClientId(client.id);
-    setViewMode("client");
-    setHydrated(true);
+    let cancelled = false;
+
+    async function hydrate() {
+      // mapDbClientToStoreClient always sets todayCheckin: undefined — it
+      // was never wired to fetch this for the CLIENT's own home view
+      // (only Zainab's client detail page got that fix). Without this,
+      // logCheckin's local optimistic update was the ONLY source of
+      // todayCheckin — which is exactly why it showed up right after
+      // checking in, then vanished on refresh: this hydrator correctly
+      // re-fetches the client fresh on every mount now, and a fresh
+      // fetch had no todayCheckin logic to bring it back.
+      const supabase = createClient();
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: checkinRow } = await supabase
+        .from("daily_checkins")
+        .select("*")
+        .eq("client_id", client.id)
+        .eq("checkin_date", today)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      const hydratedClient: Client = checkinRow
+        ? { ...client, todayCheckin: mapDbCheckinToDailyCheckin(checkinRow) }
+        : client;
+
+      setClients([hydratedClient]);
+      setActiveClientId(hydratedClient.id);
+      setViewMode("client");
+      setHydrated(true);
+    }
+
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
   }, [client, setClients, setActiveClientId, setViewMode]);
 
   if (!hydrated) {
