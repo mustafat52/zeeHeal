@@ -21,16 +21,18 @@ const statusLabel: Record<string, string> = {
   archived: "Archived",
 };
 
+/**
+ * No fetch effect in this page — NutritionistSessionHydrator (wraps this
+ * whole route group's children, in the layout) already fetches real
+ * clients + planTemplates and blocks rendering of children until both
+ * complete. A second fetch here was redundant with that guarantee and
+ * caused a real bug: the hydrator's real data renders for a frame, then
+ * this page's OWN loading state (initialized true) briefly blanks it out
+ * again with a spinner + stale mock numbers while its duplicate fetch
+ * resolves. Matches the same no-fetch pattern already used correctly on
+ * plan-builder/page.tsx.
+ */
 export default function NutritionistDashboardPage() {
-  // No fetch effect here — NutritionistSessionHydrator (wraps this whole
-  // route group's children) already fetches real clients + planTemplates
-  // and blocks rendering until both complete, so `clients` is guaranteed
-  // fresh before this page can even mount. A second fetch here was
-  // redundant with that guarantee and could cause a brief flash: the
-  // hydrator's data renders for a frame, then this page's own loading
-  // state briefly blanks it out again while its duplicate fetch resolves.
-  // Matches the same no-fetch pattern already used correctly on
-  // plan-builder/page.tsx.
   const clients = useAppStore((s) => s.clients);
   const addClient = useAppStore((s) => s.addClient);
   const [query, setQuery] = useState("");
