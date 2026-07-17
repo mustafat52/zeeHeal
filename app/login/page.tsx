@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
@@ -90,10 +91,14 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <div className="w-16 h-16 rounded-full bg-sage-100 flex items-center justify-center mx-auto mb-6">
-          <span className="font-display text-2xl text-sage-800">z</span>
-        </div>
-        <h1 className="font-display text-3xl text-moss-900 mb-2">zeeheal</h1>
+        <Image
+          src="/logo.png"
+          alt="zeeheal"
+          width={720}
+          height={485}
+          priority
+          className="w-40 h-auto mx-auto mb-6"
+        />
         <p className="text-moss-400 text-sm mb-6 leading-relaxed">
           Your skin. Your weight. Your hormones.
           <br />
