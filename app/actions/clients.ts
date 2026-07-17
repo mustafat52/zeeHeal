@@ -2,7 +2,7 @@
 
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizePhoneForAuth, phoneToSyntheticEmail } from "@/lib/phone";
+import { phoneToSyntheticEmail } from "@/lib/phone";
 import type { ConditionType, CheckinConfig } from "@/lib/mock-data/clients";
 import type { MealConfig } from "@/lib/mealConfig";
 
@@ -81,7 +81,7 @@ export async function createClientAccount(input: {
       auth_user_id: authUser.user.id,
       name: input.name,
       initials: input.initials,
-      phone: input.phone, // display format kept as typed; normalizedPhone is what auth actually stores
+      phone: input.phone, // display format kept as typed; synthetic email is what auth actually stores
       condition: input.condition,
       plan_type: input.planType || "General nutrition",
       program_duration_months: input.programDurationMonths ?? null,

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
-import { mapDbMealToUiMeal } from "@/lib/mapDbMeal";
-import { enabledMealLabels } from "@/lib/mealConfig";
+import { mapDbMealRowsWithPhotos } from "@/lib/mapDbMeal";
+import { enabledMealLabels, labelDefaultTimes } from "@/lib/mealConfig";
 import { DayPlan, MealLog } from "@/lib/mock-data/clients";
 import { LogMealModal } from "./LogMealModal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,8 +20,6 @@ const mealIcons: Record<string, React.ElementType> = {
   Dinner: Moon,
   Snack: Cookie,
 };
-
-const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function TodayMeals({
   clientId,
@@ -40,13 +38,16 @@ export function TodayMeals({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Runs once per client mount: loads today's real meals if rows already
-  // exist, otherwise generates them from the client's assigned weekly
-  // plan (weeklyPlan.days) and inserts them. If no plan is assigned yet,
-  // leaves meals empty rather than fabricating content — TodayMeals shows
-  // a "no plan assigned" message in that case. Also syncs the water
-  // counter from daily_checkins, since addWater persists there but
-  // nothing was reading it back until now — without this, a page refresh
-  // would show 0/8 even after real taps earlier in the day.
+  // exist, otherwise triggers server-side generation via the
+  // generate_todays_meals RPC (security definer — the client has no
+  // insert privilege on `meals` at all; Zainab's plan editor is the only
+  // real source of meal content, this just copies today's slice of it
+  // into real rows, including each slot's default time). If no plan is
+  // assigned yet, the RPC returns nothing and TodayMeals shows a "no plan
+  // assigned" message. Also syncs the water counter from daily_checkins,
+  // since addWater persists there but nothing was reading it back until
+  // now — without this, a page refresh would show 0/8 even after real
+  // taps earlier in the day.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!clientId) return;
@@ -79,63 +80,31 @@ export function TodayMeals({
         return;
       }
 
-      const { data: existingMeals, error } = await supabase
-        .from("meals")
-        .select("*")
-        .eq("client_id", clientId)
-        .eq("meal_date", todayStr);
+      const enabledLabels = enabledMealLabels(client?.mealConfig);
+
+      const { data: rows, error: rpcError } = await supabase.rpc("generate_todays_meals", {
+        target_client_id: clientId,
+        enabled_labels: enabledLabels,
+        label_times: labelDefaultTimes(),
+      });
 
       if (cancelled) return;
 
-      if (!error && existingMeals && existingMeals.length > 0) {
-        setClientTodayPlan(clientId, {
-          date: "Today",
-          meals: existingMeals.map(mapDbMealToUiMeal),
-          water,
-        });
-        setLoadingToday(false);
-        return;
-      }
-
-      const days = client?.weeklyPlan?.days;
-      const dayKey = DAY_KEYS[new Date().getDay()];
-      const rawItems = days?.[dayKey] ?? [];
-      // Safety net: only generate rows for slots this client currently
-      // has enabled, even if weeklyPlan.days has stale entries (e.g. a
-      // slot that was later turned off but never removed from the plan).
-      const enabledLabels = enabledMealLabels(client?.mealConfig);
-      const todaysItems = rawItems.filter((item) => enabledLabels.includes(item.label));
-
-      if (todaysItems.length === 0) {
+      if (rpcError) {
+        console.error("Failed to load/generate today's meals:", rpcError.message);
         setClientTodayPlan(clientId, { date: "Today", meals: [], water });
         setLoadingToday(false);
         return;
       }
 
-      const rowsToInsert = todaysItems.map((item) => ({
-        client_id: clientId,
-        meal_date: todayStr,
-        label: item.label,
-        items: item.items,
-        status: "pending",
-      }));
-
-      const { data: inserted, error: insertError } = await supabase
-        .from("meals")
-        .insert(rowsToInsert)
-        .select();
-
+      const mealsWithPhotos = await mapDbMealRowsWithPhotos(rows ?? []);
       if (cancelled) return;
 
-      if (!insertError && inserted) {
-        setClientTodayPlan(clientId, {
-          date: "Today",
-          meals: inserted.map(mapDbMealToUiMeal),
-          water,
-        });
-      } else if (insertError) {
-        console.error("Failed to generate today's meals:", insertError.message);
-      }
+      setClientTodayPlan(clientId, {
+        date: "Today",
+        meals: mealsWithPhotos,
+        water,
+      });
       setLoadingToday(false);
     }
 

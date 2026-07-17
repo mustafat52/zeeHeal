@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Client, ConditionType } from "@/lib/mock-data/clients";
 import { MEAL_SLOTS, MealConfig, MealSlotKey } from "@/lib/mealConfig";
-import { X, Save, Archive, ArchiveRestore, Trash2, AlertTriangle } from "lucide-react";
+import { X, Save, Archive, ArchiveRestore, Trash2, AlertTriangle, Lock } from "lucide-react";
 import clsx from "clsx";
 
 const conditionOptions: { key: ConditionType; label: string }[] = [
@@ -41,7 +41,6 @@ export function EditClientInfoModal({
   onDelete: () => void;
 }) {
   const [name, setName] = useState(client.name);
-  const [phone, setPhone] = useState(client.phone);
   const [condition, setCondition] = useState<ConditionType>(client.condition);
   const [planType, setPlanType] = useState(client.planType);
   const [goalWeight, setGoalWeight] = useState<number | null>(client.goalWeight ?? null);
@@ -58,9 +57,8 @@ export function EditClientInfoModal({
   );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const canSave = name.trim().length > 0 && phone.trim().length > 0;
+  const canSave = name.trim().length > 0;
   const conditionChanged = condition !== client.condition;
-  const phoneChanged = phone.trim() !== client.phone;
 
   function toggleMealSlot(key: MealSlotKey) {
     setMealConfig((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -71,7 +69,6 @@ export function EditClientInfoModal({
     onSave({
       name: name.trim(),
       initials: initialsFromName(name) || client.initials,
-      phone: phone.trim(),
       condition,
       planType: planType.trim() || client.planType,
       goalWeight: condition === "weight-loss" ? goalWeight ?? undefined : client.goalWeight,
@@ -108,19 +105,25 @@ export function EditClientInfoModal({
           placeholder="Full name"
           className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-2.5"
         />
-        <input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Phone number"
-          type="tel"
-          className="w-full bg-white border border-sage-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-sage-400 mb-2.5"
-        />
-        {phoneChanged && (
-          <p className="text-[11px] text-clay-600 mb-4">
-            Changing this only updates their displayed number — their login is tied to the phone number used when their account was created and won&apos;t change. Changing it here will make their existing passcode stop matching what&apos;s shown for them.
-          </p>
-        )}
-        {!phoneChanged && <div className="mb-2.5" />}
+
+        {/*
+          Decision: phone edits are blocked entirely, not just discouraged.
+          Editing the displayed number never updated the login credential
+          (a synthetic email derived from the phone at account-creation
+          time — see lib/phone.ts), which meant a "fix" here could
+          silently break a client's ability to log in with no in-app way
+          to recover. Given how rarely a client's number would actually
+          change mid-program, the number is now read-only here; the rare
+          real case gets handled directly in Supabase rather than through
+          a half-safe in-app flow.
+        */}
+        <div className="w-full bg-moss-900/[0.03] border border-sage-100 rounded-xl px-3.5 py-2.5 mb-2 flex items-center justify-between">
+          <span className="text-sm text-moss-600">{client.phone}</span>
+          <Lock size={13} className="text-moss-400 shrink-0" />
+        </div>
+        <p className="text-[11px] text-moss-400 mb-4">
+          Phone number can&apos;t be changed here — it&apos;s tied to how {client.name.split(" ")[0]} logs in. If it genuinely needs to change, that has to be done directly in the backend, not from this screen.
+        </p>
 
         <p className="text-xs font-medium text-moss-600 mb-2">Condition</p>
         <div className="flex flex-wrap gap-2 mb-2">
@@ -230,7 +233,7 @@ export function EditClientInfoModal({
           <Save size={16} /> Save changes
         </button>
         {!canSave && (
-          <p className="text-[11px] text-moss-400 text-center mt-2">Name and phone number are required</p>
+          <p className="text-[11px] text-moss-400 text-center mt-2">Name is required</p>
         )}
 
         <div className="mt-8 pt-5 border-t border-sage-100">

@@ -10,6 +10,7 @@ import { NewClientFormModal } from "@/components/nutritionist/NewClientFormModal
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { generateDigest } from "@/lib/digest";
 import { getDisplayStatus } from "@/lib/clientStatus";
+import { getTimeBasedGreeting } from "@/lib/greetings";
 import { AnimatePresence } from "framer-motion";
 import { AlertCircle, ChevronRight, Search, Plus, RefreshCw, Archive } from "lucide-react";
 
@@ -21,6 +22,15 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function NutritionistDashboardPage() {
+  // No fetch effect here — NutritionistSessionHydrator (wraps this whole
+  // route group's children) already fetches real clients + planTemplates
+  // and blocks rendering until both complete, so `clients` is guaranteed
+  // fresh before this page can even mount. A second fetch here was
+  // redundant with that guarantee and could cause a brief flash: the
+  // hydrator's data renders for a frame, then this page's own loading
+  // state briefly blanks it out again while its duplicate fetch resolves.
+  // Matches the same no-fetch pattern already used correctly on
+  // plan-builder/page.tsx.
   const clients = useAppStore((s) => s.clients);
   const addClient = useAppStore((s) => s.addClient);
   const [query, setQuery] = useState("");
@@ -46,7 +56,7 @@ export default function NutritionistDashboardPage() {
       <div className="bg-clay-100 px-6 pt-12 pb-6 rounded-b-[28px]">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-clay-600/80 text-sm">Good evening</p>
+            <p className="text-clay-600/80 text-sm">{getTimeBasedGreeting()}</p>
             <h1 className="font-display text-2xl text-moss-900 mt-0.5">Zainab&apos;s clients</h1>
           </div>
           <LogoutButton className="bg-white/70" />

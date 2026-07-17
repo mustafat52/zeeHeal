@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { mapDbCheckinToDailyCheckin } from "@/lib/mapDbCheckin";
 import { mapDbPeriodLogRows } from "@/lib/mapDbPeriod";
 import { buildCheckinHistoryFromRows } from "@/lib/mapDbProgress";
+import { buildCycleHistoryFromRows } from "@/lib/mapDbCycleHistory";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +29,7 @@ export default function ClientDetailPage() {
   const setClientTodayCheckin = useAppStore((s) => s.setClientTodayCheckin);
   const setClientPeriodLogs = useAppStore((s) => s.setClientPeriodLogs);
   const setClientCheckinHistory = useAppStore((s) => s.setClientCheckinHistory);
+  const setClientCycleHistory = useAppStore((s) => s.setClientCycleHistory);
   const renewPlanCycle = useAppStore((s) => s.renewPlanCycle);
   const updateClientProfile = useAppStore((s) => s.updateClientProfile);
   const archiveClient = useAppStore((s) => s.archiveClient);
@@ -43,10 +45,9 @@ export default function ClientDetailPage() {
   // actually closes the "client logs something, Zainab can see it" loop
   // for check-ins specifically. NOT yet real-time: if the client logs
   // something while she's already sitting on this page, she won't see it
-  // until she reloads or navigates back to it. NOTE: todayPlan.meals,
-  // client.progress (weight trend chart below), and client.notes are
-  // still the empty placeholders from the login-hydration bridge — this
-  // fetch only covers today's check-in, not those.
+  // until she reloads or navigates back to it. NOTE: todayPlan.meals and
+  // client.notes are still placeholders from the login-hydration bridge —
+  // this fetch only covers today's check-in, not those.
   useEffect(() => {
     if (!clientId) return;
     let cancelled = false;
@@ -131,6 +132,48 @@ export default function ClientDetailPage() {
       cancelled = true;
     };
   }, [clientId, client?.planCycle.startDate, client?.planCycle.totalDays, setClientCheckinHistory]);
+
+  // Fix: cycleHistory was never fetched from the real cycle_history
+  // table anywhere — it only ever got appended to LOCALLY, in-memory,
+  // right after a successful renewPlanCycle call this session. A fresh
+  // page load showed an empty history (and the "View past cycles" link
+  // below didn't even render) for any real client with genuine past
+  // cycles. Fetches the client's full cycle_history rows plus their full
+  // daily_checkins history in parallel, then reconstructs each past
+  // cycle's day-by-day data via buildCycleHistoryFromRows (see
+  // lib/mapDbCycleHistory.ts for why checkinHistory isn't stored
+  // directly in cycle_history).
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+
+    async function loadCycleHistory() {
+      const supabase = createClient();
+      const [{ data: cycleRows, error: cycleError }, { data: checkinRows, error: checkinError }] =
+        await Promise.all([
+          supabase
+            .from("cycle_history")
+            .select("*")
+            .eq("client_id", clientId)
+            .order("cycle_number", { ascending: true }),
+          supabase
+            .from("daily_checkins")
+            .select("*")
+            .eq("client_id", clientId)
+            .order("checkin_date", { ascending: true }),
+        ]);
+
+      if (cancelled) return;
+      if (!cycleError && !checkinError && cycleRows) {
+        setClientCycleHistory(clientId, buildCycleHistoryFromRows(cycleRows, checkinRows ?? []));
+      }
+    }
+
+    loadCycleHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, setClientCycleHistory]);
 
   if (!client) return null;
 

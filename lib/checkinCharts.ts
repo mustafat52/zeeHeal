@@ -22,8 +22,17 @@ export interface ChartFieldDef {
  * config doesn't match the "typical" fields for their condition.
  */
 export const CHART_FIELD_DEFS: ChartFieldDef[] = [
+  { key: "energy", label: "Energy (0–10)", colorClass: "bg-amber-500", getMax: () => 10, extract: (h) => h.energy },
   { key: "sleepHours", label: "Sleep (hrs)", colorClass: "bg-violet-300", getMax: () => 9, extract: (h) => h.sleepHours },
-  { key: "waterGlasses", label: "Water (glasses)", colorClass: "bg-sage-400", getMax: (c) => c.todayPlan.water.goal, extract: (h) => h.waterGlasses },
+  // Fix: this used to scale against c.todayPlan.water.goal — the
+  // home-screen TAP COUNTER's goal, a completely separate, independently
+  // maintained number from this field (the check-in modal's self-reported
+  // waterGlasses). The two can diverge arbitrarily (e.g. a client taps the
+  // counter to 8/8 daily but never touches this slider, or vice versa),
+  // so scaling one against the other's goal was meaningless. Using a
+  // fixed reference instead — 8, matching daily_checkins.water_goal's own
+  // schema default — since waterGlasses has no dedicated goal of its own.
+  { key: "waterGlasses", label: "Water (glasses)", colorClass: "bg-sage-400", getMax: () => 8, extract: (h) => h.waterGlasses },
   { key: "mood", label: "Mood (1–5)", colorClass: "bg-indigo-400", getMax: () => 5, extract: (h) => h.mood },
   { key: "bloating", label: "Bloating (0–10)", colorClass: "bg-orange-400", getMax: () => 10, extract: (h) => h.bloating },
   { key: "activity", label: "Activity (minutes)", colorClass: "bg-amber-400", getMax: () => 40, extract: (h) => h.activityMinutes },

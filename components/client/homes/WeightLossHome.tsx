@@ -18,8 +18,19 @@ export function WeightLossHome({ client }: { client: Client }) {
   const toGo = client.goalWeight
     ? parseFloat((currentWeight - client.goalWeight).toFixed(1))
     : null;
+
+  // Fix: previously divided by (startWeight - goalWeight) with no guard —
+  // a client already at their goal weight on day one (startWeight ===
+  // goalWeight) produced 0/0 = NaN, rendering "NaN%" and a NaN-width
+  // progress bar. The equivalent calculation in (client)/progress/page.tsx
+  // was already guarded this way; this brings WeightLossHome in line with
+  // it instead of having two versions of the same math with different
+  // safety.
+  const goalDenominator = client.goalWeight ? startWeight - client.goalWeight : 0;
   const progressPct = client.goalWeight
-    ? Math.min(Math.round((lost / (startWeight - client.goalWeight)) * 100), 100)
+    ? goalDenominator > 0
+      ? Math.min(Math.round((lost / goalDenominator) * 100), 100)
+      : 100
     : 0;
 
   return (

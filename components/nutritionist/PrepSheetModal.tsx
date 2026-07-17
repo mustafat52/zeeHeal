@@ -12,10 +12,15 @@ function trendIcon(change: number) {
 
 export function PrepSheetModal({ client, onClose }: { client: Client; onClose: () => void }) {
   const progress = client.progress;
-  const first = progress[0];
-  const last = progress[progress.length - 1];
-  const weightChange = last.weight - first.weight;
-  const bloatingChange = last.bloating - first.bloating;
+  // Same guard as CycleReportModal — a brand-new client can genuinely
+  // have zero progress rows, and this is plausibly the FIRST modal
+  // Zainab opens for someone (prepping for their first call), so it's a
+  // realistic, not edge-case, path to hit this with no data yet.
+  const hasProgress = progress.length > 0;
+  const first = hasProgress ? progress[0] : null;
+  const last = hasProgress ? progress[progress.length - 1] : null;
+  const weightChange = hasProgress ? last!.weight - first!.weight : 0;
+  const bloatingChange = hasProgress ? last!.bloating - first!.bloating : 0;
   const WeightTrend = trendIcon(weightChange);
   const BloatTrend = trendIcon(bloatingChange);
 
@@ -56,24 +61,31 @@ export function PrepSheetModal({ client, onClose }: { client: Client; onClose: (
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
-          <p className="text-xs font-medium text-moss-600 mb-3">Since {client.startDate}</p>
-          <div className="flex items-center justify-between py-1.5">
-            <span className="text-sm text-moss-900">Weight</span>
-            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
-              <WeightTrend size={13} className={weightChange < 0 ? "text-sage-600" : "text-clay-600"} />
-              {Math.abs(weightChange).toFixed(1)} kg {weightChange < 0 ? "down" : weightChange > 0 ? "up" : "no change"}
-            </span>
+        {hasProgress ? (
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
+            <p className="text-xs font-medium text-moss-600 mb-3">Since {client.startDate}</p>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-sm text-moss-900">Weight</span>
+              <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+                <WeightTrend size={13} className={weightChange < 0 ? "text-sage-600" : "text-clay-600"} />
+                {Math.abs(weightChange).toFixed(1)} kg {weightChange < 0 ? "down" : weightChange > 0 ? "up" : "no change"}
+              </span>
+            </div>
+            <div className="h-px bg-sage-100" />
+            <div className="flex items-center justify-between py-1.5 pt-2.5">
+              <span className="text-sm text-moss-900">Bloating</span>
+              <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+                <BloatTrend size={13} className={bloatingChange < 0 ? "text-sage-600" : "text-clay-600"} />
+                {bloatingChange < 0 ? "Improving" : bloatingChange > 0 ? "Worsening" : "Stable"}
+              </span>
+            </div>
           </div>
-          <div className="h-px bg-sage-100" />
-          <div className="flex items-center justify-between py-1.5 pt-2.5">
-            <span className="text-sm text-moss-900">Bloating</span>
-            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
-              <BloatTrend size={13} className={bloatingChange < 0 ? "text-sage-600" : "text-clay-600"} />
-              {bloatingChange < 0 ? "Improving" : bloatingChange > 0 ? "Worsening" : "Stable"}
-            </span>
+        ) : (
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
+            <p className="text-xs font-medium text-moss-600 mb-1">Since {client.startDate}</p>
+            <p className="text-xs text-moss-400">No progress data yet — this is a new client.</p>
           </div>
-        </div>
+        )}
 
         <p className="text-xs font-medium text-moss-600 mb-2">Recent notes</p>
         <div className="flex flex-col gap-2 mb-1">
@@ -83,6 +95,9 @@ export function PrepSheetModal({ client, onClose }: { client: Client; onClose: (
               <p className="text-sm text-moss-900">{note.text}</p>
             </div>
           ))}
+          {client.notes.length === 0 && (
+            <p className="text-xs text-moss-400">No session notes yet.</p>
+          )}
         </div>
       </motion.div>
     </div>

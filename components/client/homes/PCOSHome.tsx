@@ -13,8 +13,12 @@ import { Droplets, Flame, Activity } from "lucide-react";
 export function PCOSHome({ client }: { client: Client }) {
   const addWater = useAppStore((s) => s.addWater);
   const todayCheckin = client.todayCheckin;
-  const lastPeriod = client.periodLogs?.[client.periodLogs.length - 1];
-  const hasActivePeriod = lastPeriod && !lastPeriod.endDate;
+  // Fix: hasActivePeriod / lastPeriod were computed here but never used —
+  // PeriodCalendar below already surfaces active-period status internally
+  // ("Period started X days ago" banner), so this was dead code left over
+  // from an earlier version, not a missing feature. Removed rather than
+  // wired to something new, since there's nothing else on this screen
+  // that needs it.
 
   return (
     <div>

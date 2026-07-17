@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { mapProgressWeeklyRows, buildCheckinHistoryFromRows } from "@/lib/mapDbProgress";
+import { mapDbPeriodLogRows } from "@/lib/mapDbPeriod";
 import { Card } from "@/components/ui/Card";
 import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendingDown, TrendingUp, Droplet, Target } from "lucide-react";
@@ -31,6 +32,7 @@ export default function ClientProgressPage() {
   const client = useAppStore((s) => s.clients.find((c) => c.id === activeClientId));
   const setClientProgress = useAppStore((s) => s.setClientProgress);
   const setClientCheckinHistory = useAppStore((s) => s.setClientCheckinHistory);
+  const setClientPeriodLogs = useAppStore((s) => s.setClientPeriodLogs);
   const weightChart = useChartWidth();
   const energyChart = useChartWidth();
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,36 @@ export default function ClientProgressPage() {
       cancelled = true;
     };
   }, [client?.id]);
+
+  // Fix: previously this page relied entirely on PeriodCalendar.tsx
+  // (Home tab only) having already fetched periodLogs this session — a
+  // PCOS client landing directly on /progress via a hard refresh would
+  // see "No periods logged yet" even with real historical periods in the
+  // database, until they happened to visit Home first. This page now
+  // fetches its own copy independently, same query PeriodCalendar and the
+  // nutritionist's client detail page already use.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!client || client.condition !== "pcos") return;
+    let cancelled = false;
+
+    async function loadPeriodLogs() {
+      const supabase = createClient();
+      const { data: logs, error } = await supabase
+        .from("period_logs")
+        .select("*, period_flow_logs(*)")
+        .eq("client_id", client!.id)
+        .order("start_date", { ascending: true });
+
+      if (cancelled || error || !logs) return;
+      setClientPeriodLogs(client!.id, mapDbPeriodLogRows(logs));
+    }
+
+    loadPeriodLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [client?.id, client?.condition]);
 
   if (!client) return null;
 
@@ -260,7 +292,13 @@ export default function ClientProgressPage() {
             label="Water (glasses)"
             data={skincareWaterData}
             totalDays={client.planCycle.totalDays}
-            max={client.todayPlan.water.goal}
+            // Fix: previously max={client.todayPlan.water.goal} — the
+            // home-screen tap counter's goal, an unrelated tracker from
+            // this chart's actual data (the check-in modal's self-reported
+            // waterGlasses). Using a fixed 8 instead, matching
+            // daily_checkins.water_goal's own schema default, same fix as
+            // lib/checkinCharts.ts's waterGlasses chart definition.
+            max={8}
             colorClass="bg-sage-400"
             unitLabel="days logged"
           />

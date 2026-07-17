@@ -5,6 +5,7 @@ import { PeriodLog, FlowIntensity } from "@/lib/mock-data/clients";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { mapDbPeriodLogRows } from "@/lib/mapDbPeriod";
+import { parseRelativeDate } from "@/lib/period";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, Check } from "lucide-react";
 import clsx from "clsx";
@@ -28,17 +29,10 @@ function firstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
-function parseRelativeDate(str: string): Date | null {
-  const today = new Date();
-  if (str === "Today") return today;
-  const m = str.match(/(\d+)\s+days?\s+ago/);
-  if (m) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - parseInt(m[1]));
-    return d;
-  }
-  return null;
-}
+// Fix: this file previously had its own local copy of parseRelativeDate,
+// identical to the one in lib/period.ts — now imported from there instead
+// (see period.ts and periodDateLabels.ts, which shared this exact
+// duplication problem). One canonical implementation, three consumers.
 
 /** Converts an actual Date back into the app's relative-string format. */
 function labelForDate(date: Date): string {

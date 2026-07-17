@@ -32,11 +32,17 @@ export function CycleReportModal({
   onRenew: () => void;
 }) {
   const progress = client.progress;
-  const first = progress[0];
-  const last = progress[progress.length - 1];
-  const weightChange = last.weight - first.weight;
-  const bloatingChange = last.bloating - first.bloating;
-  const energyChange = last.energy - first.energy;
+  // A brand-new client can genuinely have zero progress rows — the
+  // client-side Progress page already guards this (see
+  // (client)/progress/page.tsx); this modal previously didn't, and would
+  // crash on first.weight/last.weight when Zainab opened it for a client
+  // who just started.
+  const hasProgress = progress.length > 0;
+  const first = hasProgress ? progress[0] : null;
+  const last = hasProgress ? progress[progress.length - 1] : null;
+  const weightChange = hasProgress ? last!.weight - first!.weight : 0;
+  const bloatingChange = hasProgress ? last!.bloating - first!.bloating : 0;
+  const energyChange = hasProgress ? last!.energy - first!.energy : 0;
 
   const WeightTrend = trendIcon(weightChange);
   const BloatTrend = trendIcon(bloatingChange);
@@ -145,43 +151,52 @@ export function CycleReportModal({
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
-          <p className="text-xs font-medium text-moss-600 mb-3">Since {client.startDate}</p>
-          <div className="flex items-center justify-between py-1.5">
-            <span className="text-sm text-moss-900">Weight</span>
-            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
-              <WeightTrend
-                size={13}
-                className={weightChange < 0 ? "text-sage-600" : weightChange > 0 ? "text-clay-600" : "text-moss-400"}
-              />
-              {Math.abs(weightChange).toFixed(1)} kg {weightChange < 0 ? "down" : weightChange > 0 ? "up" : "no change"}
-            </span>
+        {hasProgress ? (
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
+            <p className="text-xs font-medium text-moss-600 mb-3">Since {client.startDate}</p>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-sm text-moss-900">Weight</span>
+              <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+                <WeightTrend
+                  size={13}
+                  className={weightChange < 0 ? "text-sage-600" : weightChange > 0 ? "text-clay-600" : "text-moss-400"}
+                />
+                {Math.abs(weightChange).toFixed(1)} kg {weightChange < 0 ? "down" : weightChange > 0 ? "up" : "no change"}
+              </span>
+            </div>
+            <div className="h-px bg-sage-100" />
+            <div className="flex items-center justify-between py-1.5 pt-2.5">
+              <span className="text-sm text-moss-900">Bloating</span>
+              <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+                <BloatTrend
+                  size={13}
+                  className={bloatingChange < 0 ? "text-sage-600" : bloatingChange > 0 ? "text-clay-600" : "text-moss-400"}
+                />
+                {bloatingChange < 0 ? "Improving" : bloatingChange > 0 ? "Worsening" : "Stable"}
+              </span>
+            </div>
+            <div className="h-px bg-sage-100" />
+            <div className="flex items-center justify-between py-1.5 pt-2.5">
+              <span className="text-sm text-moss-900">Energy</span>
+              <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
+                <EnergyTrend
+                  size={13}
+                  className={energyChange > 0 ? "text-sage-600" : energyChange < 0 ? "text-clay-600" : "text-moss-400"}
+                />
+                {energyChange > 0 ? "Improving" : energyChange < 0 ? "Dropping" : "Stable"}
+              </span>
+            </div>
           </div>
-          <div className="h-px bg-sage-100" />
-          <div className="flex items-center justify-between py-1.5 pt-2.5">
-            <span className="text-sm text-moss-900">Bloating</span>
-            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
-              <BloatTrend
-                size={13}
-                className={bloatingChange < 0 ? "text-sage-600" : bloatingChange > 0 ? "text-clay-600" : "text-moss-400"}
-              />
-              {bloatingChange < 0 ? "Improving" : bloatingChange > 0 ? "Worsening" : "Stable"}
-            </span>
+        ) : (
+          <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4">
+            <p className="text-xs font-medium text-moss-600 mb-1">Since {client.startDate}</p>
+            <p className="text-xs text-moss-400">
+              No weekly progress data yet — trends will show here once check-ins start coming in.
+            </p>
           </div>
-          <div className="h-px bg-sage-100" />
-          <div className="flex items-center justify-between py-1.5 pt-2.5">
-            <span className="text-sm text-moss-900">Energy</span>
-            <span className="flex items-center gap-1 text-sm font-medium text-moss-900">
-              <EnergyTrend
-                size={13}
-                className={energyChange > 0 ? "text-sage-600" : energyChange < 0 ? "text-clay-600" : "text-moss-400"}
-              />
-              {energyChange > 0 ? "Improving" : energyChange < 0 ? "Dropping" : "Stable"}
-            </span>
-          </div>
-        </div>
+        )}
 
-        {client.condition === "weight-loss" && client.goalWeight !== undefined && (
+        {client.condition === "weight-loss" && client.goalWeight !== undefined && hasProgress && (
           <div className="bg-white rounded-xl border border-sage-100/60 p-3.5 mb-4 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
               <Target size={14} className="text-amber-600" />
@@ -189,7 +204,7 @@ export function CycleReportModal({
             <div>
               <p className="text-xs text-moss-400">Goal weight</p>
               <p className="text-sm font-medium text-moss-900">
-                {last.weight} kg now · {Math.max(last.weight - client.goalWeight, 0).toFixed(1)} kg to {client.goalWeight} kg
+                {last!.weight} kg now · {Math.max(last!.weight - client.goalWeight, 0).toFixed(1)} kg to {client.goalWeight} kg
               </p>
             </div>
           </div>

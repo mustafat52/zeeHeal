@@ -26,6 +26,16 @@ export function enabledMealLabels(config: MealConfig | undefined): string[] {
 }
 
 /**
+ * Maps each meal label to its slot's default time ("Breakfast" ->
+ * "8:00 am"), for passing to the generate_todays_meals RPC so real meal
+ * rows actually get a `time` value — previously defaultTime was defined
+ * here but nothing ever wrote it to a real row.
+ */
+export function labelDefaultTimes(): Record<string, string> {
+  return Object.fromEntries(MEAL_SLOTS.map((slot) => [slot.label, slot.defaultTime]));
+}
+
+/**
  * Builds a blank week (all 7 days) containing exactly the meal slots this
  * client has enabled, each with an empty items string. Used by the plan
  * editor when no template/existing plan exists yet.

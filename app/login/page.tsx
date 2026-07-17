@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
-import { normalizePhoneForAuth, phoneToSyntheticEmail } from "@/lib/phone";
+import { phoneToSyntheticEmail } from "@/lib/phone";
 import { Button } from "@/components/ui/Button";
 import { WelcomeTransition } from "@/components/ui/WelcomeTransition";
 import { motion, AnimatePresence } from "framer-motion";

@@ -60,6 +60,16 @@ export interface DailyCheckin {
   sleepHours?: number;
   mood?: number;
   bloating?: number;
+  /**
+   * Real per-day energy level (0-10), matching daily_checkins.energy's
+   * check constraint. Previously this column existed in the schema and
+   * ProgressPoint.energy (a WEEKLY average) was displayed in several
+   * places, but nothing ever captured a daily value — those weekly
+   * numbers were always averaging over nulls. Added so energy tracking
+   * is actually real, not just a schema column and some UI reading from
+   * an always-empty source.
+   */
+  energy?: number;
   activityType?: string;
   activityMinutes?: number;
   skinCondition?: number;
@@ -74,6 +84,7 @@ export const CHECKIN_FIELDS = [
   { key: "weight", label: "Weight", hint: "Daily weigh-in" },
   { key: "sleepHours", label: "Sleep", hint: "Hours slept" },
   { key: "mood", label: "Mood / energy", hint: "How they're feeling" },
+  { key: "energy", label: "Energy level", hint: "How energetic they felt today" },
   { key: "bloating", label: "Bloating / digestion", hint: "Gut health, GI symptoms" },
   { key: "activity", label: "Activity", hint: "Exercise type and duration" },
   { key: "skinCondition", label: "Skin condition", hint: "Acne, breakouts, flare-ups" },

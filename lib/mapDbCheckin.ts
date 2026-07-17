@@ -14,6 +14,11 @@ export function mapDbCheckinToDailyCheckin(row: any): DailyCheckin {
     sleepHours: row.sleep_hours ?? undefined,
     mood: row.mood ?? undefined,
     bloating: row.bloating ?? undefined,
+    // Fix: energy previously had no UI to capture it, so this column was
+    // always null — mapped here now that DailyCheckinModal actually
+    // collects it (see lib/mock-data/clients.ts and store.ts's logCheckin
+    // for the rest of the chain).
+    energy: row.energy ?? undefined,
     activityType: row.activity_type ?? undefined,
     activityMinutes: row.activity_minutes ?? undefined,
     skinCondition: row.skin_condition ?? undefined,

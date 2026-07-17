@@ -18,7 +18,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "zeeheal",
   description: "Your skin. Your weight. Your hormones. One root cause.",
-  manifest: "/manifest.json",
+  // Fix: app/manifest.ts (Next's built-in manifest convention) is served
+  // at /manifest.webmanifest, not /manifest.json — this was pointing at a
+  // path nothing actually serves, so the <link rel="manifest"> tag likely
+  // 404'd silently, breaking "Add to Home Screen" icon/name/theme-color
+  // behavior even though the manifest content itself was correct.
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

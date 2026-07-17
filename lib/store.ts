@@ -47,7 +47,7 @@ interface AppState {
   addClient: (client: Client) => void;
   /**
    * Bulk-replaces the entire client list — used by the nutritionist
-   * dashboard to hydrate real data from Supabase on load, replacing
+   * session hydrator to hydrate real data from Supabase on load, replacing
    * whatever was there (the initial mock personas) wholesale rather than
    * merging. Distinct from addClient, which appends one client without
    * touching the rest (used right after NewClientFormModal creates
@@ -74,7 +74,8 @@ interface AppState {
    * Pure read-hydration — sets a client's todayCheckin from a Supabase
    * fetch without touching checkinHistory or lastLog, unlike logCheckin
    * (which is a real logging action). Used by the nutritionist's client
-   * detail page to pull in today's real check-in on load.
+   * detail page to pull in today's real check-in on load, and by
+   * ClientSessionHydrator on the client's own side.
    */
   setClientTodayCheckin: (clientId: string, checkin: DailyCheckin | undefined) => void;
   /**
@@ -86,6 +87,14 @@ interface AppState {
    * This is what actually populates it on her side.
    */
   setClientNotes: (clientId: string, notes: { date: string; text: string }[]) => void;
+  /**
+   * Pure read-hydration for cycleHistory — fixes the gap where past
+   * cycles existed in the real cycle_history table but nothing ever
+   * fetched them; cycleHistory was only ever populated in-memory right
+   * after a renewPlanCycle call this session. See
+   * lib/mapDbCycleHistory.ts for how the snapshots are actually built.
+   */
+  setClientCycleHistory: (clientId: string, cycleHistory: CycleSnapshot[]) => void;
   toggleMeal: (clientId: string, mealId: string) => void;
   logMeal: (clientId: string, mealId: string, log: MealLog, photoStoragePath?: string) => void;
   addWater: (clientId: string) => void;
@@ -100,7 +109,14 @@ interface AppState {
   addSessionNote: (clientId: string, text: string) => void;
   updateClientProfile: (
     clientId: string,
-    updates: Partial<Pick<Client, "name" | "initials" | "phone" | "condition" | "planType" | "goalWeight" | "programDurationMonths" | "mealConfig">>
+    // Decision: phone edits are blocked entirely, not just discouraged.
+    // The client's actual login credential (synthetic email, see
+    // lib/phone.ts) is fixed at account-creation time and never
+    // regenerated — a phone change here would silently break their login
+    // with no way to fix it except manually in Supabase. "phone" removed
+    // from the allowed fields so this is a compile-time guarantee, not
+    // just a UI convention EditClientInfoModal happens to follow.
+    updates: Partial<Pick<Client, "name" | "initials" | "condition" | "planType" | "goalWeight" | "programDurationMonths" | "mealConfig">>
   ) => void;
   archiveClient: (clientId: string) => void;
   unarchiveClient: (clientId: string) => void;
@@ -178,6 +194,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setClientNotes: (clientId, notes) =>
     set((state) => ({
       clients: state.clients.map((c) => (c.id === clientId ? { ...c, notes } : c)),
+    })),
+  setClientCycleHistory: (clientId, cycleHistory) =>
+    set((state) => ({
+      clients: state.clients.map((c) => (c.id === clientId ? { ...c, cycleHistory } : c)),
     })),
 
   toggleMeal: (clientId, mealId) =>
@@ -275,15 +295,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     }));
 
-    // energy has no UI control yet (DailyCheckinModal doesn't collect it),
-    // so it's intentionally omitted here rather than sent as null — a
-    // future check-in from the same day would otherwise clobber a real
-    // value with null if energy capture gets added later without updating
-    // this call site.
+    // energy is now captured for real by DailyCheckinModal — persisted
+    // just like every other field. Previously omitted here on purpose
+    // since no UI collected it yet; now that it does, sending it (even as
+    // null when not configured on) is correct and consistent with every
+    // other field's handling below.
     persistDailyCheckin(clientId, {
       weight: checkin.weight ?? null,
       sleep_hours: checkin.sleepHours ?? null,
       mood: checkin.mood ?? null,
+      energy: checkin.energy ?? null,
       bloating: checkin.bloating ?? null,
       activity_type: checkin.activityType ?? null,
       activity_minutes: checkin.activityMinutes ?? null,
@@ -332,13 +353,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   logPeriodEnd: (clientId, dateLabel = "Today") => {
+    // Fix: previously the local optimistic update only set endDate, not
+    // cycleLength — the async server call below computes and persists
+    // cycleLength correctly, but until the next real refetch, any UI
+    // reading log.cycleLength (the "X-day period" label on the client's
+    // own Progress page, CycleReportModal's "last was X days" line) would
+    // show undefined for that brief window. Computing the same day-count
+    // locally here closes that gap — same math as the server side, just
+    // applied immediately too.
     set((state) => ({
       clients: state.clients.map((c) => {
         if (c.id !== clientId) return c;
         const logs = [...(c.periodLogs ?? [])];
         const last = logs[logs.length - 1];
         if (last && !last.endDate) {
-          logs[logs.length - 1] = { ...last, endDate: dateLabel };
+          const startISOLocal = relativeLabelToISODate(last.startDate);
+          const endISOLocal = relativeLabelToISODate(dateLabel);
+          const cycleLength =
+            Math.round(
+              (new Date(endISOLocal + "T00:00:00").getTime() -
+                new Date(startISOLocal + "T00:00:00").getTime()) /
+                86400000
+            ) + 1;
+          logs[logs.length - 1] = { ...last, endDate: dateLabel, cycleLength };
         }
         return { ...c, periodLogs: logs };
       }),
@@ -522,21 +559,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     const dbUpdates: Record<string, any> = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.initials !== undefined) dbUpdates.initials = updates.initials;
-    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
     if (updates.condition !== undefined) dbUpdates.condition = updates.condition;
     if (updates.planType !== undefined) dbUpdates.plan_type = updates.planType;
     if (updates.goalWeight !== undefined) dbUpdates.goal_weight = updates.goalWeight;
     if (updates.programDurationMonths !== undefined) dbUpdates.program_duration_months = updates.programDurationMonths;
     if (updates.mealConfig !== undefined) dbUpdates.meal_config = updates.mealConfig;
 
-    // NOTE: updating `phone` here only changes the display column. The
-    // client's actual login credential is a synthetic email derived from
-    // whatever phone number was on file at ACCOUNT CREATION time (see
-    // lib/phone.ts) — it does not get regenerated here. Editing a
-    // client's phone number through this action will silently break
-    // their ability to log in with their new number. Flagged, not fixed —
-    // needs a real decision (block phone edits? regenerate the account?)
-    // before this is safe to use for that field specifically.
+    // phone is deliberately never included here — see the type comment
+    // above. Blocked entirely rather than "handled carefully," since the
+    // actual fix (regenerating the auth account) is a bigger, separate
+    // decision that wasn't taken. Rare edits go through Supabase directly.
     const supabase = createClient();
     supabase
       .from("clients")
