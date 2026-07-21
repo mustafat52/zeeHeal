@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { mapDbCheckinToDailyCheckin } from "@/lib/mapDbCheckin";
+import { mapDbMealRowsWithPhotos } from "@/lib/mapDbMeal";
 import { mapDbPeriodLogRows } from "@/lib/mapDbPeriod";
 import { buildCheckinHistoryFromRows } from "@/lib/mapDbProgress";
 import { buildCycleHistoryFromRows } from "@/lib/mapDbCycleHistory";
@@ -18,7 +19,9 @@ import { PlanHistoryModal } from "@/components/nutritionist/PlanHistoryModal";
 import { EditClientInfoModal } from "@/components/nutritionist/EditClientInfoModal";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History, PenLine, Pencil, UtensilsCrossed } from "lucide-react";
+import { ChevronLeft, MessageCircle, ClipboardList, Settings2, Phone, FileText, History, PenLine, Pencil, UtensilsCrossed, Camera } from "lucide-react";
+import { SkinPhotoGallery } from "@/components/nutritionist/SkinPhotoGallery";
+import { MealPhotoGallery } from "@/components/nutritionist/MealPhotoGallery";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -30,6 +33,7 @@ export default function ClientDetailPage() {
   const setClientPeriodLogs = useAppStore((s) => s.setClientPeriodLogs);
   const setClientCheckinHistory = useAppStore((s) => s.setClientCheckinHistory);
   const setClientCycleHistory = useAppStore((s) => s.setClientCycleHistory);
+  const setClientTodayPlan = useAppStore((s) => s.setClientTodayPlan);
   const renewPlanCycle = useAppStore((s) => s.renewPlanCycle);
   const updateClientProfile = useAppStore((s) => s.updateClientProfile);
   const archiveClient = useAppStore((s) => s.archiveClient);
@@ -174,6 +178,49 @@ export default function ClientDetailPage() {
       cancelled = true;
     };
   }, [clientId, setClientCycleHistory]);
+
+  // Fixes a real gap: todayPlan.meals is left as an empty placeholder by
+  // mapDbClientToStoreClient for EVERY client on Zainab's side — she never
+  // triggers meal generation the way TodayMeals.tsx does on the client's
+  // own view, so "Today's meals" below (and the "📷 Photo attached"
+  // indicator on each one) was always empty regardless of what the client
+  // actually logged. This is read-only: it does NOT call
+  // generate_todays_meals — if the client hasn't opened their app yet
+  // today, there's genuinely nothing to show yet, and that's correct,
+  // not a bug to paper over by force-generating meals from her side.
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+
+    async function loadTodaysMeals() {
+      const supabase = createClient();
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const { data: rows, error } = await supabase
+        .from("meals")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("meal_date", todayStr);
+
+      if (cancelled || error || !rows) return;
+
+      const mealsWithPhotos = await mapDbMealRowsWithPhotos(rows);
+      if (cancelled) return;
+
+      // Preserves whatever water value is already in the store rather
+      // than overwriting it with a fresh placeholder — nothing else on
+      // Zainab's side populates water, so this only ever touches meals.
+      setClientTodayPlan(clientId, {
+        date: "Today",
+        meals: mealsWithPhotos,
+        water: client?.todayPlan.water ?? { current: 0, goal: 8 },
+      });
+    }
+
+    loadTodaysMeals();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, setClientTodayPlan]);
 
   if (!client) return null;
 
@@ -388,6 +435,15 @@ export default function ClientDetailPage() {
         </Card>
       )}
 
+      {client.condition === "skincare" && (
+        <Card className="mb-5">
+          <p className="text-sm font-medium text-moss-600 mb-3 flex items-center gap-1.5">
+            <Camera size={13} className="text-teal-600" /> Skin photo log
+          </p>
+          <SkinPhotoGallery clientId={client.id} />
+        </Card>
+      )}
+
       <Card className="mb-5">
         <p className="text-sm font-medium text-moss-600 mb-3">Today&apos;s meals</p>
         <div className="flex flex-col gap-2.5">
@@ -411,6 +467,13 @@ export default function ClientDetailPage() {
             </div>
           ))}
         </div>
+      </Card>
+
+      <Card className="mb-5">
+        <p className="text-sm font-medium text-moss-600 mb-3 flex items-center gap-1.5">
+          <Camera size={13} className="text-amber-600" /> Meal photo log
+        </p>
+        <MealPhotoGallery clientId={client.id} />
       </Card>
 
       <Card className="mb-5">
