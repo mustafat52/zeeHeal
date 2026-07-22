@@ -1,6 +1,26 @@
 import type { Client } from "@/lib/mock-data/clients";
 
 /**
+ * Computes which day of the (fixed 15-day) plan cycle "today" actually is,
+ * from the cycle's real start date — rather than trusting the stored
+ * current_cycle_day column. Fix: nothing anywhere in the app ever
+ * incremented that column as real calendar days passed — it's set to 1
+ * at account creation and only ever touched again by renew_plan_cycle's
+ * reset, so a real client's displayed "Day X/15" stayed frozen at 1
+ * indefinitely until their first cycle renewal. Capped at totalDays so a
+ * client whose review is overdue shows "Day 15" (matching the existing
+ * "review due" UI) rather than growing past the cycle's own length.
+ */
+export function computeCurrentCycleDay(currentCycleStart: string, totalDays = 15): number {
+  const start = new Date(currentCycleStart + "T00:00:00");
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const elapsed = Math.floor((today.getTime() - start.getTime()) / 86400000) + 1;
+  return Math.max(1, Math.min(elapsed, totalDays));
+}
+
+/**
  * Maps a real `clients` table row (snake_case, real dates) onto the
  * Client shape the rest of the app still reads from Zustand. Deliberate
  * bridge, not a finished data layer — see the field-by-field notes below.
@@ -24,7 +44,7 @@ export function mapDbClientToStoreClient(row: any): Client {
     planCycle: {
       cycleNumber: row.current_cycle_number,
       startDate: row.current_cycle_start,
-      currentDay: row.current_cycle_day,
+      currentDay: computeCurrentCycleDay(row.current_cycle_start),
       totalDays: 15,
     },
     programDurationMonths: row.program_duration_months ?? undefined,

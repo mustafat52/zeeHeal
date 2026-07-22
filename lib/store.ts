@@ -7,6 +7,7 @@ import { createClient } from "./supabase/client";
 import { deleteClientAccount } from "@/app/actions/clients";
 import { relativeLabelToISODate } from "./periodDateLabels";
 import { reconcileWeekWithConfig } from "./mealConfig";
+import { computeCurrentCycleDay } from "./mapDbClient";
 
 /** Today's date as YYYY-MM-DD, matching daily_checkins.checkin_date. */
 function todayDateString() {
@@ -490,7 +491,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           planCycle: {
             cycleNumber: data.current_cycle_number,
             startDate: data.current_cycle_start,
-            currentDay: data.current_cycle_day,
+            currentDay: computeCurrentCycleDay(data.current_cycle_start),
             totalDays: 15,
           },
           checkinHistory: Array.from({ length: 15 }, () => null),
